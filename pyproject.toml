@@ -1,0 +1,15 @@
+[project]
+name = "sdv-assets"
+version = "0.1.0"
+description = "Capture and archive official team, conference, league and event marks for SportsDataverse"
+requires-python = ">=3.11"
+dependencies = ["requests>=2.31", "pillow>=10"]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
