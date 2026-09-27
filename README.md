@@ -50,7 +50,7 @@ packages, as those packages already display them.
 ```sh
 uv run python -m sdv_assets.capture                 # every source
 uv run python -m sdv_assets.capture nhl_catalog      # one source
-scripts/publish.sh                                   # upload new images and the manifest to Spaces
+scripts/run_pipeline.sh                              # capture, publish, open a manifest PR (see RUNBOOK.md)
 uv run pytest
 ```
 

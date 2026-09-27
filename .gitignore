@@ -4,3 +4,4 @@ __pycache__/
 # images live in DigitalOcean Spaces, not git
 store/
 .omc/
+logs/
