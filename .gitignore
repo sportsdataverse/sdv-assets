@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 # images live in DigitalOcean Spaces, not git
 store/
+.omc/

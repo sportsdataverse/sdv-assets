@@ -77,14 +77,12 @@ def sniff(body: bytes) -> tuple[str | None, int | None, int | None]:
     w, h = img.size
     if w < 8 or h < 8:
         return None, None, None
-    # a fully transparent or single-colour image is a placeholder, not a mark
-    extrema = img.convert("RGBA").getextrema()
-    if (
-        extrema[3][1] == 0
-        or all(lo == hi for lo, hi in extrema[:3])
-        and extrema[3][0] == extrema[3][1]
-    ):
-        return None, None, None
+    # a fully transparent or single-colour image is a placeholder, not a mark. Placeholders are small;
+    # decoding a 4096x4096 brand-set PNG for this test costs seconds, so large images get verify() only.
+    if w * h <= 1_000_000:
+        extrema = img.convert("RGBA").getextrema()
+        if extrema[3][1] == 0 or (all(lo == hi for lo, hi in extrema[:3]) and extrema[3][0] == extrema[3][1]):
+            return None, None, None
     return (
         {"PNG": "png", "JPEG": "jpg", "GIF": "gif", "WEBP": "webp"}.get(
             img.format, img.format.lower()
@@ -204,6 +202,8 @@ def main(names: list[str]) -> None:
         }
 
     write_csv(MANIFEST / "marks.csv", list(kept.values()), MARK_FIELDS + IMAGE_FIELDS)
+    # a run over some sources keeps the other sources' failures
+    failures += [r for r in read_csv(MANIFEST / "failures.csv") if r["url"] not in results]
     write_csv(MANIFEST / "failures.csv", failures, MARK_FIELDS + ["error", "checked"])
     ok = sum(1 for r in results.values() if r["ok"])
     images = len({r["sha256"] for r in results.values() if r["ok"]})
