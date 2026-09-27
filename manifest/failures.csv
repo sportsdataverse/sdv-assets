@@ -1,0 +1,14 @@
+level,league,entity_id,entity_name,program,mark_type,variant,valid_from,valid_to,source,url,error,checked
+conference,cfb,12,Conference USA,,logo,dark,,,espn,https://a.espncdn.com/i/teamlogos/ncaa_conf/500-dark/12.png,"HTTP 404, not an image (1 B)",2026-09-26
+conference,cfb,177,United Athletic Conference,,logo,dark,,,espn,https://a.espncdn.com/i/teamlogos/ncaa_conf/500-dark/177.png,"HTTP 404, not an image (1 B)",2026-09-26
+conference,cfb,177,United Athletic Conference,,logo,default,,,espn,https://a.espncdn.com/i/teamlogos/ncaa_conf/500/177.png,"HTTP 404, not an image (1 B)",2026-09-26
+conference,cfb,179,Ohio Valley Conference,,logo,dark,,,espn,https://a.espncdn.com/i/teamlogos/ncaa_conf/500-dark/179.png,"HTTP 404, not an image (1 B)",2026-09-26
+conference,cfb,179,Ohio Valley Conference,,logo,default,,,espn,https://a.espncdn.com/i/teamlogos/ncaa_conf/500/179.png,"HTTP 404, not an image (1 B)",2026-09-26
+conference,cfb,20,Big Sky Conference,,logo,dark,,,espn,https://a.espncdn.com/i/teamlogos/ncaa_conf/500-dark/20.png,"HTTP 404, not an image (1 B)",2026-09-26
+conference,cfb,22,Ivy League,,logo,dark,,,espn,https://a.espncdn.com/i/teamlogos/ncaa_conf/500-dark/22.png,"HTTP 404, not an image (1 B)",2026-09-26
+conference,cfb,24,Mid-Eastern Athletic Conference,,logo,dark,,,espn,https://a.espncdn.com/i/teamlogos/ncaa_conf/500-dark/24.png,"HTTP 404, not an image (1 B)",2026-09-26
+conference,cfb,29,Southern Conference,,logo,dark,,,espn,https://a.espncdn.com/i/teamlogos/ncaa_conf/500-dark/29.png,"HTTP 404, not an image (1 B)",2026-09-26
+conference,cfb,32,FCS Independents,,logo,dark,,,espn,https://a.espncdn.com/i/teamlogos/ncaa_conf/500-dark/32.png,"HTTP 404, not an image (1 B)",2026-09-26
+conference,cfb,37,Sun Belt Conference,,logo,dark,,,espn,https://a.espncdn.com/i/teamlogos/ncaa_conf/500-dark/37.png,"HTTP 404, not an image (1 B)",2026-09-26
+conference,mlb,103,American League,,logo,on_dark,,,mlbstatic,https://www.mlbstatic.com/team-logos/league-on-dark/103.svg,"HTTP 404, not an image (14 B)",2026-09-26
+conference,mlb,104,National League,,logo,on_dark,,,mlbstatic,https://www.mlbstatic.com/team-logos/league-on-dark/104.svg,"HTTP 404, not an image (14 B)",2026-09-26

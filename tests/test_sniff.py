@@ -26,3 +26,9 @@ def test_sniff_keeps_real_images_and_rejects_placeholders():
     assert sniff(png(mono))[0] == "png"
     assert sniff(b'<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>' + b" " * 64)[0] == "svg"
     assert sniff(b"<html><body>Not found</body></html>" + b" " * 64)[0] is None
+
+
+def test_sniff_rejects_large_placeholders_too():
+    # any size: a 1001 x 1000 blank is still a placeholder
+    assert sniff(png(Image.new("RGBA", (1001, 1000), (0, 0, 0, 0))))[0] is None
+    assert sniff(png(Image.new("RGB", (1001, 1000), (255, 255, 255))))[0] is None

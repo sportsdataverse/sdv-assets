@@ -8,7 +8,9 @@ Seasons follow SDV conventions: ending year for NHL / NBA / MBB / WBB, single or
 from __future__ import annotations
 
 import csv
+import datetime as dt
 import io
+import os
 
 import requests
 
@@ -64,7 +66,10 @@ def row(
 
 
 def _get_json(session, url):
-    r = session.get(url, headers=UA, timeout=60)
+    """JSON API calls. ESPN's site API blocks datacenter IPs after heavy traffic, so these few calls can go
+    through a proxy (SDV_ASSETS_API_PROXY, a full proxy URL); image downloads never do."""
+    proxy = os.environ.get("SDV_ASSETS_API_PROXY")
+    r = session.get(url, headers=UA, timeout=60, proxies={"http": proxy, "https": proxy} if proxy else None)
     r.raise_for_status()
     return r.json()
 
@@ -113,16 +118,28 @@ def espn_groups(session):
     """College conference logos as ESPN's core API links them (current season), plus the numeric CFB files."""
     out = []
     core = "https://sports.core.api.espn.com/v2/sports"
-    for league, sport, espn_league, roots in [
-        ("cfb", "football", "college-football", [80, 81]),
-        ("mbb", "basketball", "mens-college-basketball", [50]),
-        ("wbb", "basketball", "womens-college-basketball", [50]),
+    yr = dt.date.today().year
+    # core groups hang off a season; basketball seasons are named for the year they end
+    for league, sport, espn_league, roots, seasons in [
+        ("cfb", "football", "college-football", [80, 81], [yr, yr - 1]),
+        ("mbb", "basketball", "mens-college-basketball", [50], [yr + 1, yr]),
+        ("wbb", "basketball", "womens-college-basketball", [50], [yr + 1, yr]),
     ]:
         for root in roots:
-            kids = _get_json(
-                session,
-                f"{core}/{sport}/leagues/{espn_league}/groups/{root}/children?limit=100",
-            )
+            kids = {}
+            for season in seasons:
+                try:
+                    found = _get_json(
+                        session,
+                        f"{core}/{sport}/leagues/{espn_league}/seasons/{season}/types/2/groups/{root}/children?limit=100",
+                    )
+                except requests.HTTPError:
+                    continue
+                if found.get("items"):
+                    kids = found
+                    break
+            if not kids:
+                raise RuntimeError(f"ESPN returned no {league} groups under {root} for seasons {seasons}")
             for item in kids.get("items", []):
                 g = _get_json(session, item["$ref"].replace("https://", "http://"))
                 for logo in g.get("logos", []):
