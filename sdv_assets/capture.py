@@ -30,6 +30,8 @@ STORE = Path(os.environ.get("SDV_ASSETS_STORE", "/mnt/sdv_repos/sdv-assets-store
 MANIFEST = Path(__file__).resolve().parent.parent / "manifest"
 PUBLIC_BASE = "https://sdv.nyc3.cdn.digitaloceanspaces.com/assets/public/sha256"
 WORKERS = int(os.environ.get("SDV_ASSETS_WORKERS", "4"))
+# sha256 -> (ext, width, height) for images an earlier run already validated
+VALIDATED: dict[str, tuple] = {}
 
 MARK_FIELDS = [
     "level",
@@ -77,12 +79,11 @@ def sniff(body: bytes) -> tuple[str | None, int | None, int | None]:
     w, h = img.size
     if w < 8 or h < 8:
         return None, None, None
-    # a fully transparent or single-colour image is a placeholder, not a mark. Placeholders are small;
-    # decoding a 4096x4096 brand-set PNG for this test costs seconds, so large images get verify() only.
-    if w * h <= 1_000_000:
-        extrema = img.convert("RGBA").getextrema()
-        if extrema[3][1] == 0 or (all(lo == hi for lo, hi in extrema[:3]) and extrema[3][0] == extrema[3][1]):
-            return None, None, None
+    # a fully transparent or single-colour image is a placeholder, not a mark, at any size. Decoding a
+    # 4096 px brand-set PNG costs seconds, so fetch() only calls sniff() for images it hasn't validated before.
+    extrema = (img if img.mode == "RGBA" else img.convert("RGBA")).getextrema()
+    if extrema[3][1] == 0 or (all(lo == hi for lo, hi in extrema[:3]) and extrema[3][0] == extrema[3][1]):
+        return None, None, None
     return (
         {"PNG": "png", "JPEG": "jpg", "GIF": "gif", "WEBP": "webp"}.get(
             img.format, img.format.lower()
@@ -102,16 +103,19 @@ def fetch(session: requests.Session, url: str) -> dict:
             if r.status_code in (429, 500, 502, 503, 504):
                 err = f"HTTP {r.status_code}"
             else:
-                ext, w, h = (
-                    sniff(r.content) if r.status_code == 200 else (None, None, None)
-                )
+                sha = hashlib.sha256(r.content).hexdigest()
+                if r.status_code != 200:
+                    ext, w, h = None, None, None
+                elif sha in VALIDATED:
+                    ext, w, h = VALIDATED[sha]
+                else:
+                    ext, w, h = sniff(r.content)
                 if not ext:
                     return {
                         "url": url,
                         "ok": False,
                         "error": f"HTTP {r.status_code}, not an image ({len(r.content)} B)",
                     }
-                sha = hashlib.sha256(r.content).hexdigest()
                 path = STORE / "sha256" / sha[:2] / f"{sha}.{ext}"
                 if not path.exists():
                     path.parent.mkdir(parents=True, exist_ok=True)
@@ -149,6 +153,8 @@ def write_csv(path: Path, rows: list[dict], fields: list[str]) -> None:
 def main(names: list[str]) -> None:
     today = dt.date.today().isoformat()
     session = requests.Session()
+    for r in read_csv(MANIFEST / "marks.csv"):
+        VALIDATED[r["sha256"]] = (r["ext"], int(r["width"]) if r["width"] else None, int(r["height"]) if r["height"] else None)
     chosen = [s for s in sources.SOURCES if not names or s.__name__ in names]
 
     candidates = []
