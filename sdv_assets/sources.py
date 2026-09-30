@@ -11,6 +11,7 @@ import csv
 import datetime as dt
 import io
 import os
+import re
 
 import requests
 
@@ -27,6 +28,7 @@ ESPN_LEAGUES = [
     ("cfb", "football", "college-football", "football"),
     ("mbb", "basketball", "mens-college-basketball", "mens"),
     ("wbb", "basketball", "womens-college-basketball", "womens"),
+    ("ufl", "football", "ufl", "pro"),
 ]
 
 # Division I programs ESPN's teams lists leave out (see sdvplotR data-raw/generate_logo_ref.R)
@@ -65,10 +67,11 @@ def row(
     }
 
 
-def _get_json(session, url):
+def _get_json(session, url, use_proxy=True):
     """JSON API calls. ESPN's site API blocks datacenter IPs after heavy traffic, so these few calls can go
-    through a proxy (SDV_ASSETS_API_PROXY, a full proxy URL); image downloads never do."""
-    proxy = os.environ.get("SDV_ASSETS_API_PROXY")
+    through a proxy (SDV_ASSETS_API_PROXY, a full proxy URL); image downloads never do. The MLB Stats API
+    refuses that proxy (403), so its calls pass ``use_proxy=False``."""
+    proxy = os.environ.get("SDV_ASSETS_API_PROXY") if use_proxy else None
     r = session.get(url, headers=UA, timeout=60, proxies={"http": proxy, "https": proxy} if proxy else None)
     r.raise_for_status()
     return r.json()
@@ -300,7 +303,7 @@ MLB_FOLDERS = [
 def mlbstatic(session):
     """MLB's own CDN: team logos and wordmarks by MLB team id, plus the AL / NL / MLB league marks."""
     # https with a query string answers 406 from datacenter hosts; http works
-    teams = _get_json(session, "http://statsapi.mlb.com/api/v1/teams?sportId=1")[
+    teams = _get_json(session, "http://statsapi.mlb.com/api/v1/teams?sportId=1", use_proxy=False)[
         "teams"
     ]
     out = []
@@ -335,6 +338,41 @@ def mlbstatic(session):
                     variant=f"on_{bg}",
                 )
             )
+    return out
+
+
+# MLB Stats API minor-league levels. 15 (short-season A) ended with the 2021 reorganization; 13 was "Advanced A" before it.
+MILB_LEVELS = {11: "aaa", 12: "aa", 13: "high_a", 14: "single_a", 15: "short_a", 16: "rookie"}
+# mlbstatic serves only the on-light marks for minor-league teams (the on-dark folders answer 404)
+MILB_FOLDERS = [f for f in MLB_FOLDERS if "dark" not in f[0]]
+
+
+def milb(session, first_season=2005):
+    """Minor-league team logos and wordmarks from mlbstatic, for every team id the Stats API lists in any season since
+    ``first_season``: teams dropped in the 2021 reorganization still have their last logo there. mlbstatic keeps one
+    current mark per team id, so the rows carry no validity window."""
+    last = {}
+    for season in range(first_season, dt.date.today().year + 1):
+        for sport_id, level in MILB_LEVELS.items():
+            try:
+                teams = _get_json(
+                    session, f"http://statsapi.mlb.com/api/v1/teams?sportId={sport_id}&season={season}", use_proxy=False
+                )
+            except requests.HTTPError as e:
+                if e.response is not None and e.response.status_code == 404:
+                    continue  # the level did not exist that season (short-season A ended after 2020)
+                raise
+            for t in teams.get("teams", []):
+                last[t["id"]] = (t["name"], level)  # later seasons overwrite: the newest name and level win
+    out = []
+    for tid, (name, level) in sorted(last.items()):
+        for folder, mark_type, variant in MILB_FOLDERS:
+            out.append(
+                row("team", "milb", tid, name, f"https://www.mlbstatic.com/team-logos/{folder}{tid}.svg", "mlbstatic",
+                    variant=variant, mark_type=mark_type, program=level)
+            )
+    if not out:
+        raise RuntimeError("milb: the Stats API listed no minor-league teams")
     return out
 
 
@@ -376,4 +414,144 @@ def nflverse(session):
     return out
 
 
-SOURCES = [espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse]
+ESPN_CORE = "https://sports.core.api.espn.com/v2/sports"
+ESPN_SITE = "https://site.web.api.espn.com/apis/site/v2/sports"
+
+
+def _espn_site_teams(session, sport, league):
+    """A competition's current teams from ESPN's site API; [] when ESPN has no team list for it (404)."""
+    try:
+        data = _get_json(session, f"{ESPN_SITE}/{sport}/{league}/teams?limit=1000")
+    except requests.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            return []
+        raise  # a 403 is the droplet being blocked, not an empty league: fail the source, don't publish a gap
+    leagues = (data.get("sports") or [{}])[0].get("leagues") or [{}]
+    return [t["team"] for t in leagues[0].get("teams", [])]
+
+
+def espn_soccer(session):
+    """Every club in every soccer competition ESPN lists (219 on 2026-09-30). A club appears in its league and in
+    each cup it plays; capture collapses those repeats to one row per club and logo."""
+    comps = [
+        ref["$ref"].split("/leagues/")[1].split("?")[0]
+        for ref in _get_json(session, f"{ESPN_CORE}/soccer/leagues?limit=1000")["items"]
+    ]
+    out = []
+    for comp in comps:
+        for t in _espn_site_teams(session, "soccer", comp):
+            for logo in t.get("logos", []):
+                out.append(
+                    row("team", "soccer", t["id"], t.get("displayName"), logo["href"], "espn",
+                        variant=_variant(logo.get("rel", [])))
+                )
+    if not out:
+        raise RuntimeError(f"espn_soccer: {len(comps)} competitions listed but no club logos returned")
+    return out
+
+
+# (sdv league, ESPN sport, ESPN league, seasons): per-season team lists from ESPN's core API, for leagues whose
+# teams changed from season to season; the site API's current list only shows today's teams.
+ESPN_SEASONS = [
+    ("xfl", "football", "xfl", [2020, 2023]),
+    ("ufl", "football", "ufl", [2024, 2025, 2026]),
+]
+
+
+def espn_seasons(session):
+    """Each season's team logos, one row per team and logo with valid_from/valid_to spanning the seasons it was used."""
+    span = {}
+    for league, sport, espn_league, seasons in ESPN_SEASONS:
+        for y in seasons:
+            refs = _get_json(session, f"{ESPN_CORE}/{sport}/leagues/{espn_league}/seasons/{y}/teams?limit=100")
+            for ref in refs["items"]:
+                t = _get_json(session, ref["$ref"])
+                for logo in t.get("logos", []):
+                    key = (league, str(t["id"]), logo["href"], _variant(logo.get("rel", [])))
+                    lo, hi, name = span.get(key, (y, y, t.get("displayName")))
+                    span[key] = (min(lo, y), max(hi, y), name)
+    return [
+        row("team", league, tid, name, href, "espn", variant=variant, program="pro", valid_from=lo, valid_to=hi)
+        for (league, tid, href, variant), (lo, hi, name) in span.items()
+    ]
+
+
+# HockeyTech leagues and the public keys their own sites use (the same registry as fastRhockey
+# R/hockeytech_leagues.R and sdv-py sportsdataverse/hockeytech/_leagues.py): (sdv league, client code, key, feed, program)
+_HT_LS = "https://lscluster.hockeytech.com/feed/index.php"
+HOCKEYTECH = [
+    ("pwhl", "pwhl", "446521baf8c38984", _HT_LS, "pro"),
+    ("ahl", "ahl", "ccb91f29d6744675", _HT_LS, "pro"),
+    ("ohl", "ohl", "f1aa699db3d81487", _HT_LS, "junior"),
+    ("whl", "whl", "f1aa699db3d81487", _HT_LS, "junior"),
+    ("qmjhl", "lhjmq", "f322673b6bcae299", "https://cluster.leaguestat.com/feed/index.php", "junior"),
+]
+
+
+def _hockey_season(name):
+    """'2024-25 Regular Season' -> 2025 (hockey seasons are keyed by their ending year); '2024 Regular Season' -> 2024."""
+    m = re.match(r"(\d{4})(-\d{2,4})?", name)
+    if not m:
+        return None
+    return int(m.group(1)) + (1 if m.group(2) else 0)
+
+
+def hockeytech(session):
+    """Every team's logo in every regular season HockeyTech lists. Most seasons have their own file
+    (``logos/{team}_{season}.png``), so this is the logo history, not just today's marks; a file reused across
+    seasons becomes one row spanning them."""
+    span = {}
+    for league, client, key, feed, program in HOCKEYTECH:
+        base = f"{feed}?feed=modulekit&key={key}&client_code={client}&fmt=json"
+        seasons = _get_json(session, f"{base}&view=seasons")["SiteKit"]["Seasons"]
+        regular = [s for s in seasons if s.get("career") == "1" and s.get("playoff") == "0"]
+        if not regular:
+            raise RuntimeError(f"hockeytech: {league} lists no regular seasons")
+        for s in regular:
+            year = _hockey_season(s["season_name"])
+            teams = _get_json(session, f"{base}&view=teamsbyseason&season_id={s['season_id']}")["SiteKit"]
+            for t in teams.get("Teamsbyseason") or []:
+                if not t.get("team_logo_url") or year is None:
+                    continue
+                # some leagues reuse one file across seasons (logos/{team}.png): one row, the full range of seasons
+                k = (league, program, str(t["id"]), t["team_logo_url"])
+                lo, hi, name = span.get(k, (year, year, t.get("name")))
+                span[k] = (min(lo, year), max(hi, year), name)
+    return [
+        row("team", league, tid, name, url, "hockeytech", program=program, valid_from=lo, valid_to=hi)
+        for (league, program, tid, url), (lo, hi, name) in span.items()
+    ]
+
+
+# Fox's public data key (the one foxsports.com uses; sdv-py _fox_layout.DATA_KEY). Override with SDV_ASSETS_FOX_KEY.
+FOX_KEY = os.environ.get("SDV_ASSETS_FOX_KEY", "jE7yBJVRNAwdDesMgTzTXUUSx1It41Fq")
+# USFL (2022-23, owned by Fox) teams Fox's list no longer carries: (name, logo file stem)
+USFL_EXTRA = [("Tampa Bay Bandits", "Bandits")]
+
+
+def _fox_original(url):
+    """Fox logo URLs point at a resized copy (``Stallions.vresize.200.200.medium.1.png``); the original sits beside it."""
+    return re.sub(r"\.vresize\.[^/]*(\.png)$", r"\1", url)
+
+
+def fox_usfl(session):
+    """USFL team logos from Fox, which owned and broadcast the league (ESPN never carried it)."""
+    data = _get_json(session, f"https://api.foxsports.com/bifrost/v1/usfl/league/teams?apikey={FOX_KEY}&api-version=1.1")
+    out = []
+    for item in (i for g in data["groups"] for i in g.get("items", [])):
+        slug = item["entityLink"]["webUrl"].rstrip("/").split("/")[-1].removesuffix("-team")
+        urls = {"default": item.get("logoUrl"), "alternate": item.get("alternateLogoUrl")}
+        urls = {v: _fox_original(u) for v, u in urls.items() if u}
+        if urls.get("alternate") == urls.get("default"):
+            del urls["alternate"]  # Fox repeats the default for teams with no alternate mark
+        for variant, url in urls.items():
+            out.append(row("team", "usfl", slug, item["title"], url, "fox", variant=variant, program="pro"))
+    for name, stem in USFL_EXTRA:
+        out.append(row("team", "usfl", name.lower().replace(" ", "-"), name,
+                       f"https://b.fssta.com/uploads/application/usfl/team-logos/{stem}.png", "fox", program="pro"))
+    return out
+
+
+SOURCES = [
+    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl,
+]
