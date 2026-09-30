@@ -456,23 +456,51 @@ ESPN_SEASONS = [
     ("xfl", "football", "xfl", [2020, 2023]),
     ("ufl", "football", "ufl", [2024, 2025, 2026]),
 ]
+# Teams a season list leaves out but ESPN still serves by id: (ESPN league, season, team id)
+ESPN_SEASON_EXTRA = [("xfl", 2023, 112647)]  # 2023 Arlington Renegades
+
+
+def _espn_season_files(league, espn_league, tid, name, abbr, y):
+    """The per-league files ESPN keeps for a team abbreviation (``xfl/500/dal.png``). The team's ``guid/…/logos``
+    URLs are NOT used: one guid serves the team's current image for every season (the 2020 Dallas Renegades guid
+    shows the 2024 Arlington logo)."""
+    for folder, variant in (("500", "default"), ("500-dark", "dark")):
+        yield (league, tid, name, f"{ESPN}/{espn_league}/{folder}/{abbr.lower()}.png", variant, y)
 
 
 def espn_seasons(session):
-    """Each season's team logos, one row per team and logo with valid_from/valid_to spanning the seasons it was used."""
-    span = {}
+    """Each season's team logos from ESPN's per-league abbreviation files, one row per file with the seasons ESPN
+    listed that team under it. ESPN overwrites a file in place when an abbreviation passes to a new team
+    (``ufl/500/hou.png`` was the Roughnecks in 2024-25 and is the Gamblers from 2026), so a file shared by
+    several teams belongs only to the team that used it last."""
+    seen = []
     for league, sport, espn_league, seasons in ESPN_SEASONS:
+        core = f"{ESPN_CORE}/{sport}/leagues/{espn_league}/seasons"
         for y in seasons:
-            refs = _get_json(session, f"{ESPN_CORE}/{sport}/leagues/{espn_league}/seasons/{y}/teams?limit=100")
-            for ref in refs["items"]:
-                t = _get_json(session, ref["$ref"])
-                for logo in t.get("logos", []):
-                    key = (league, str(t["id"]), logo["href"], _variant(logo.get("rel", [])))
-                    lo, hi, name = span.get(key, (y, y, t.get("displayName")))
-                    span[key] = (min(lo, y), max(hi, y), name)
+            refs = [i["$ref"] for i in _get_json(session, f"{core}/{y}/teams?limit=100")["items"]]
+            refs += [f"{core}/{y}/teams/{tid}" for lg, sy, tid in ESPN_SEASON_EXTRA if lg == espn_league and sy == y]
+            for ref in refs:
+                t = _get_json(session, ref)
+                if t.get("abbreviation"):
+                    seen += _espn_season_files(league, espn_league, str(t["id"]), t.get("displayName"), t["abbreviation"], y)
+    # an identity is (team id, name): ESPN keeps one id through a rebrand (the 2024-25 Houston Roughnecks and the 2026
+    # Houston Gamblers are one franchise id), and the rebrand overwrote the file just as a new team would
+    # (names compare without case or punctuation: ESPN writes "D.C. Defenders" and "DC Defenders", "BattleHawks" and
+    # "Battlehawks" for the same identity, while "Seattle Dragons" -> "Seattle Sea Dragons" is a real rebrand)
+    span, owner, shown = {}, {}, {}
+    for league, tid, name, url, variant, y in seen:
+        ident = (tid, re.sub(r"[^a-z0-9]", "", (name or "").lower()))
+        lo, hi = span.get((league, ident, url, variant), (y, y))
+        span[(league, ident, url, variant)] = (min(lo, y), max(hi, y))
+        if y >= owner.get(url, (0, None))[0]:
+            owner[url] = (y, ident)
+        if y >= shown.get(ident, (0, None))[0]:
+            shown[ident] = (y, name)  # label a row with the identity's latest spelling
     return [
-        row("team", league, tid, name, href, "espn", variant=variant, program="pro", valid_from=lo, valid_to=hi)
-        for (league, tid, href, variant), (lo, hi, name) in span.items()
+        row("team", league, ident[0], shown[ident][1], url, "espn", variant=variant, program="pro",
+            valid_from=lo, valid_to=hi)
+        for (league, ident, url, variant), (lo, hi) in span.items()
+        if owner[url][1] == ident
     ]
 
 
@@ -485,6 +513,7 @@ HOCKEYTECH = [
     ("ohl", "ohl", "f1aa699db3d81487", _HT_LS, "junior"),
     ("whl", "whl", "f1aa699db3d81487", _HT_LS, "junior"),
     ("qmjhl", "lhjmq", "f322673b6bcae299", "https://cluster.leaguestat.com/feed/index.php", "junior"),
+    ("ushl", "ushl", "e828f89b243dc43f", _HT_LS, "junior"),
 ]
 
 
@@ -552,6 +581,23 @@ def fox_usfl(session):
     return out
 
 
+def echl_site(session):
+    """ECHL team logos from the league's own teams page. The ECHL runs on HockeyTech, but its site renders on the
+    server and its API key is not public, so this reads the current season's files (``logos/{team}_{season}.png``)
+    that the page links; history waits for a key."""
+    r = session.get("https://echl.com/teams", headers=UA, timeout=60)
+    r.raise_for_status()
+    pat = r'<img[^>]*?(?:alt="([^"]+)"[^>]*?src="(https://assets\.leaguestat\.com/echl/logos/(\d+)[^"]*)"'
+    pat += r'|src="(https://assets\.leaguestat\.com/echl/logos/(\d+)[^"]*)"[^>]*?alt="([^"]+)")'
+    out = {}
+    for m in re.finditer(pat, r.text):
+        name, url, tid = (m.group(1), m.group(2), m.group(3)) if m.group(2) else (m.group(6), m.group(4), m.group(5))
+        out[url] = row("team", "echl", tid, name, url, "echl", program="pro")
+    if not out:
+        raise RuntimeError("echl_site: the teams page links no team logos")
+    return list(out.values())
+
+
 SOURCES = [
-    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl,
+    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, echl_site,
 ]

@@ -49,52 +49,33 @@ def test_a_competition_without_a_team_list_is_skipped_but_a_block_fails_the_sour
         sources._espn_site_teams(blocked, "soccer", "eng.1")
 
 
-def test_espn_seasons_spans_a_reused_logo_and_splits_a_changed_one(monkeypatch):
-    monkeypatch.setattr(
-        sources, "ESPN_SEASONS", [("ufl", "football", "ufl", [2024, 2025])]
-    )
+def test_espn_seasons_uses_league_files_and_gives_a_reused_file_to_its_last_team(monkeypatch):
+    monkeypatch.setattr(sources, "ESPN_SEASONS", [("ufl", "football", "ufl", [2024, 2025, 2026])])
+    monkeypatch.setattr(sources, "ESPN_SEASON_EXTRA", [("ufl", 2026, 9)])
     core = f"{sources.ESPN_CORE}/football/leagues/ufl/seasons"
-    session = FakeSession(
-        {
-            f"{core}/2024/": (200, {"items": [{"$ref": "https://core/t1-2024"}]}),
-            f"{core}/2025/": (200, {"items": [{"$ref": "https://core/t1-2025"}]}),
-            "https://core/t1-2024": (
-                200,
-                {
-                    "id": 1,
-                    "displayName": "Stallions",
-                    "logos": [
-                        _logo("https://x/a.png"),
-                        _logo("https://x/old-dark.png", "dark"),
-                    ],
-                },
-            ),
-            "https://core/t1-2025": (
-                200,
-                {
-                    "id": 1,
-                    "displayName": "Stallions",
-                    "logos": [
-                        _logo("https://x/a.png"),
-                        _logo("https://x/new-dark.png", "dark"),
-                    ],
-                },
-            ),
-        }
-    )
-    rows = {
-        (r["url"], r["valid_from"], r["valid_to"])
-        for r in sources.espn_seasons(session)
-    }
+
+    def team(tid, name, abbr):
+        guid = f"https://a.espncdn.com/guid/{tid}/logos/default.png"
+        return (200, {"id": tid, "displayName": name, "abbreviation": abbr, "logos": [{"href": guid}]})
+
+    session = FakeSession({
+        f"{core}/2024/teams?": (200, {"items": [{"$ref": "https://core/rough"}, {"$ref": "https://core/dc"}]}),
+        f"{core}/2025/teams?": (200, {"items": [{"$ref": "https://core/rough"}, {"$ref": "https://core/dc"}]}),
+        f"{core}/2026/teams?": (200, {"items": [{"$ref": "https://core/gamb"}]}),
+        f"{core}/2026/teams/9": team(9, "D.C. Defenders", "DC"),  # left out of 2026's list; respelled, not renamed
+        "https://core/rough": team(1, "Houston Roughnecks", "HOU"),
+        "https://core/gamb": team(1, "Houston Gamblers", "HOU"),  # same franchise id, rebranded
+        "https://core/dc": team(9, "DC Defenders", "DC"),
+    })
+    rows = {(r["entity_name"], r["variant"], r["url"].split("teamlogos/")[1], r["valid_from"], r["valid_to"])
+            for r in sources.espn_seasons(session)}
     assert rows == {
-        (
-            "https://x/a.png",
-            2024,
-            2025,
-        ),  # the same default logo both seasons: one row, one range
-        ("https://x/old-dark.png", 2024, 2024),
-        ("https://x/new-dark.png", 2025, 2025),
-    }
+        # hou.png passed from the Roughnecks to the Gamblers (one franchise id, renamed), so today's file is only the Gamblers'
+        ("Houston Gamblers", "default", "ufl/500/hou.png", 2026, 2026),
+        ("Houston Gamblers", "dark", "ufl/500-dark/hou.png", 2026, 2026),
+        ("D.C. Defenders", "default", "ufl/500/dc.png", 2024, 2026),
+        ("D.C. Defenders", "dark", "ufl/500-dark/dc.png", 2024, 2026),
+    }  # and no guid URL: one guid serves a team's current image for every season
 
 
 def test_hockey_seasons_are_keyed_by_their_ending_year():
