@@ -626,6 +626,28 @@ def espn_cricket(session):
     return out
 
 
+# The commit holding curated/aaf/*.png; raw URLs pinned to it stay valid after later commits
+AAF_CROPS_COMMIT = "67cd398edb1f3e6102581367015a7b3fea354e1d"
+AAF_STRIP = "https://web.archive.org/web/2019id_/https://aaf.com/images/TeamLogos.png"
+
+
+def aaf_strip(session):
+    """AAF (2019): the only official artwork left is aaf.com's 836x64 strip of all eight logos (see curated/aaf/README.md).
+    The untouched strip is captured as the league's row; the eight owner-approved crops of it are marked
+    ``source=aaf-strip-crop`` / ``variant=crop_64px`` so they are never mistaken for original files."""
+    out = [row("league", "aaf", "aaf", "Alliance of American Football", AAF_STRIP, "aaf.com", variant="team_strip",
+               valid_from=2019, valid_to=2019)]
+    raw = f"https://raw.githubusercontent.com/sportsdataverse/sdv-assets/{AAF_CROPS_COMMIT}/curated/aaf"
+    with open(CURATED / "aaf" / "crops.csv", newline="") as f:
+        for t in csv.DictReader(f):
+            name = " ".join(w.capitalize() for w in t["slug"].split("-"))
+            out.append(
+                row("team", "aaf", t["pff_franchise_id"], name, f"{raw}/{t['slug']}.png", "aaf-strip-crop",
+                    variant="crop_64px", program="pro", valid_from=2019, valid_to=2019)
+            )
+    return out
+
+
 SOURCES = [
-    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, echl_site, espn_cricket,
+    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, echl_site, espn_cricket, aaf_strip,
 ]
