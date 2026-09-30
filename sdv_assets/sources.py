@@ -515,6 +515,9 @@ HOCKEYTECH = [
     ("whl", "whl", "f1aa699db3d81487", _HT_LS, "junior"),
     ("qmjhl", "lhjmq", "f322673b6bcae299", "https://cluster.leaguestat.com/feed/index.php", "junior"),
     ("ushl", "ushl", "e828f89b243dc43f", _HT_LS, "junior"),
+    # the key the ECHL's own site sent from the browser before it moved to server rendering (in 377 Wayback-archived
+    # API calls); validated 2026-10-01 against modulekit/seasons (21 regular seasons, 2006-07 on)
+    ("echl", "echl", "e18cfddba0db3b21", _HT_LS, "pro"),
 ]
 
 
@@ -582,23 +585,6 @@ def fox_usfl(session):
     return out
 
 
-def echl_site(session):
-    """ECHL team logos from the league's own teams page. The ECHL runs on HockeyTech, but its site renders on the
-    server and its API key is not public, so this reads the current season's files (``logos/{team}_{season}.png``)
-    that the page links; history waits for a key."""
-    r = session.get("https://echl.com/teams", headers=UA, timeout=60)
-    r.raise_for_status()
-    pat = r'<img[^>]*?(?:alt="([^"]+)"[^>]*?src="(https://assets\.leaguestat\.com/echl/logos/(\d+)[^"]*)"'
-    pat += r'|src="(https://assets\.leaguestat\.com/echl/logos/(\d+)[^"]*)"[^>]*?alt="([^"]+)")'
-    out = {}
-    for m in re.finditer(pat, r.text):
-        name, url, tid = (m.group(1), m.group(2), m.group(3)) if m.group(2) else (m.group(6), m.group(4), m.group(5))
-        out[url] = row("team", "echl", tid, name, url, "echl", program="pro")
-    if not out:
-        raise RuntimeError("echl_site: the teams page links no team logos")
-    return list(out.values())
-
-
 CURATED = Path(__file__).resolve().parent.parent / "curated"
 CRICINFO_IMG = "https://img1.hscicdn.com/image/upload"
 
@@ -649,5 +635,5 @@ def aaf_strip(session):
 
 
 SOURCES = [
-    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, echl_site, espn_cricket, aaf_strip,
+    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip,
 ]

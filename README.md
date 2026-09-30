@@ -42,8 +42,7 @@ Official sources only:
   ESPN overwrites a file when a team rebrands or its abbreviation passes to another team, so a file's season range covers
   only the identity that last used it (a logo replaced under the same name and abbreviation cannot be detected).
 - Fox: USFL (2022-23) team logos. Fox owned the league.
-- HockeyTech, the stats platform the leagues' own sites use: PWHL, AHL, OHL, WHL, QMJHL and USHL logos for every regular season.
-- The ECHL's own teams page: current logos (the ECHL's HockeyTech key is not public, so no history yet).
+- HockeyTech, the stats platform the leagues' own sites use: PWHL, AHL, ECHL, OHL, WHL, QMJHL and USHL logos for every regular season.
 - Cricket: ESPN's CDN by ESPNcricinfo team id, plus ESPNcricinfo's own image of each team's mark (variant `cricinfo`),
   for the teams in `curated/cricinfo_teams.csv` (national sides and T20 franchises; ESPN's and Cricinfo's APIs refuse
   the droplet, so the list is curated from Cricinfo pages archived by the Wayback Machine).
