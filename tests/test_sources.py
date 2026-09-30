@@ -152,3 +152,14 @@ def test_espn_cricket_reads_every_curated_team_once():
     assert any(r["program"] == "womens" for r in rows)
     cricinfo = {r["entity_name"]: r["url"] for r in rows if r["variant"] == "cricinfo"}
     assert cricinfo["Texas Super Kings"].startswith(sources.CRICINFO_IMG + "/lsci/db/PICTURES/CMS/")
+
+
+def test_aaf_crops_are_marked_derived_and_keyed_by_pff_franchise_id():
+    rows = sources.aaf_strip(None)
+    strip, crops = rows[0], rows[1:]
+    assert strip["level"] == "league" and strip["url"] == sources.AAF_STRIP
+    assert len(crops) == 8 and {r["source"] for r in crops} == {"aaf-strip-crop"}
+    assert {r["variant"] for r in crops} == {"crop_64px"}
+    assert [r["entity_id"] for r in crops] == [str(i) for i in range(719, 727)]  # PFF ids, strip order
+    assert crops[6]["entity_name"] == "San Antonio Commanders"
+    assert all(sources.AAF_CROPS_COMMIT in r["url"] for r in crops)

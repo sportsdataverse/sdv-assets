@@ -17,7 +17,7 @@ mark after its source changes.
 | Column | Meaning |
 |---|---|
 | `level` | `team`, `division`, `conference`, `league` |
-| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket` |
+| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket`, `aaf` |
 | `entity_id`, `entity_name` | The source's id and name for the team, group or league |
 | `program` | `pro`, `football`, `mens`, `womens` (Tennessee's Lady Vols mark is a `womens` row), `junior` (OHL/WHL/QMJHL/USHL), and the MiLB level (`aaa`, `aa`, `high_a`, `single_a`, `short_a`, `rookie`) |
 | `mark_type`, `variant` | `logo` / `wordmark`; `default`, `dark`, the ESPN brand-set variants, `on_light` / `on_dark`, … |
@@ -47,6 +47,8 @@ Official sources only:
 - Cricket: ESPN's CDN by ESPNcricinfo team id, plus ESPNcricinfo's own image of each team's mark (variant `cricinfo`),
   for the teams in `curated/cricinfo_teams.csv` (national sides and T20 franchises; ESPN's and Cricinfo's APIs refuse
   the droplet, so the list is curated from Cricinfo pages archived by the Wayback Machine).
+- AAF (2019): aaf.com's archived strip of all eight logos, plus eight crops of it marked `source=aaf-strip-crop`,
+  `variant=crop_64px` (owner-approved; no separate official files survive; see `curated/aaf/README.md`).
 - MLB's CDN for minor-league teams: every team the Stats API lists at any level since 2005 (current marks only).
 
 Non-free Wikipedia files and third-party logo sites (sportslogos.net, Sports Reference) are never captured here.
