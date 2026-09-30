@@ -497,8 +497,9 @@ def _hockey_season(name):
 
 
 def hockeytech(session):
-    """Every team's logo in every regular season HockeyTech lists. The league sites publish one logo file per team
-    per season (``logos/{team}_{season}.png``), so this is the logo history, not just today's marks."""
+    """Every team's logo in every regular season HockeyTech lists. Most seasons have their own file
+    (``logos/{team}_{season}.png``), so this is the logo history, not just today's marks; a file reused across
+    seasons becomes one row spanning them."""
     span = {}
     for league, client, key, feed, program in HOCKEYTECH:
         base = f"{feed}?feed=modulekit&key={key}&client_code={client}&fmt=json"
