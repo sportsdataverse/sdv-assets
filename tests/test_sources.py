@@ -140,3 +140,15 @@ def test_hockeytech_spans_a_file_reused_across_seasons(monkeypatch):
     assert rows == {("https://ht/logos/7.png", 2024, 2025),  # one file, both seasons
                     ("https://ht/logos/8_1.png", 2024, 2024), ("https://ht/logos/8_2.png", 2025, 2025)}
 
+
+
+def test_espn_cricket_reads_every_curated_team_once():
+    rows = sources.espn_cricket(None)
+    ids = [r["entity_id"] for r in rows if r["variant"] == "default"]
+    assert len(ids) == len(set(ids)) >= 100  # one ESPN row per Cricinfo id
+    by_id = {r["entity_id"]: r for r in rows if r["variant"] == "default"}
+    assert by_id["6"]["url"].endswith("/cricket/500/6.png") and by_id["6"]["program"] == "mens"  # India
+    assert by_id["1381353"]["entity_name"] == "Texas Super Kings"  # Major League Cricket
+    assert any(r["program"] == "womens" for r in rows)
+    cricinfo = {r["entity_name"]: r["url"] for r in rows if r["variant"] == "cricinfo"}
+    assert cricinfo["Texas Super Kings"].startswith(sources.CRICINFO_IMG + "/lsci/db/PICTURES/CMS/")

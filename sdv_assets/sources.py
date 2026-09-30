@@ -12,6 +12,7 @@ import datetime as dt
 import io
 import os
 import re
+from pathlib import Path
 
 import requests
 
@@ -598,6 +599,33 @@ def echl_site(session):
     return list(out.values())
 
 
+CURATED = Path(__file__).resolve().parent.parent / "curated"
+CRICINFO_IMG = "https://img1.hscicdn.com/image/upload"
+
+
+def espn_cricket(session):
+    """Cricket team logos ESPN serves by ESPNcricinfo team id (``cricket/500/{id}.png``): national sides and the
+    major T20 franchises. ESPN's cricket API and Cricinfo's own API refuse the droplet, so the ids come from
+    ``curated/cricinfo_teams.csv``, built from ESPNcricinfo's team index and series pages as the Wayback Machine
+    archived them (2026-09-30). Add a row when a new franchise starts."""
+    out = []
+    with open(CURATED / "cricinfo_teams.csv", newline="") as f:
+        for t in csv.DictReader(f):
+            program = "womens" if "women" in t["slug"] else "mens"
+            out.append(
+                row("team", "cricket", t["cricinfo_id"], t["name"], f"{ESPN}/cricket/500/{t['cricinfo_id']}.png", "espn",
+                    program=program)
+            )
+            # ESPNcricinfo's own image of the team's mark (a flag for national sides); it covers franchises ESPN's CDN
+            # lacks (all of Major League Cricket)
+            if t.get("cricinfo_logo"):
+                out.append(
+                    row("team", "cricket", t["cricinfo_id"], t["name"], CRICINFO_IMG + t["cricinfo_logo"], "cricinfo",
+                        variant="cricinfo", program=program)
+                )
+    return out
+
+
 SOURCES = [
-    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, echl_site,
+    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, echl_site, espn_cricket,
 ]

@@ -1,0 +1,120 @@
+cricinfo_id,slug,name,cricinfo_logo
+1,england,England,/lsci/db/PICTURES/CMS/419200/419236.png
+2,australia,Australia,
+3,south-africa,South Africa,/lsci/db/PICTURES/CMS/382700/382733.png
+4,west-indies,West Indies,/lsci/db/PICTURES/CMS/317600/317615.png
+5,new-zealand,New Zealand,
+6,india,India,/lsci/db/PICTURES/CMS/381800/381895.png
+7,pakistan,Pakistan,
+8,sri-lanka,Sri Lanka,
+9,zimbabwe,Zimbabwe,
+11,united-states-of-america,United States Of America,
+15,netherlands,Netherlands,/lsci/db/PICTURES/CMS/381800/381893.png
+17,canada,Canada,/lsci/db/PICTURES/CMS/381800/381855.png
+20,papua-new-guinea,Papua New Guinea,
+25,bangladesh,Bangladesh,
+27,united-arab-emirates,United Arab Emirates,
+28,namibia,Namibia,/lsci/db/PICTURES/CMS/381800/381857.png
+29,ireland,Ireland,/lsci/db/PICTURES/CMS/313100/313149.logo.png
+30,scotland,Scotland,/lsci/db/PICTURES/CMS/313100/313150.logo.png
+33,nepal,Nepal,/lsci/db/PICTURES/CMS/319900/319958.png
+37,oman,Oman,/lsci/db/PICTURES/CMS/381800/381858.png
+40,afghanistan,Afghanistan,/lsci/db/PICTURES/CMS/381800/381892.png
+238,australia-women,Australia Women,
+975,england-women,England Women,
+1812,india-women,India Women,
+2234,ireland-women,Ireland Women,
+2410,netherlands-women,Netherlands Women,
+2563,new-zealand-women,New Zealand Women,
+2971,pakistan-women,Pakistan Women,
+3328,south-africa-women,South Africa Women,
+3621,sri-lanka-women,Sri Lanka Women,
+3816,west-indies-women,West Indies Women,
+271866,zimbabwe-women,Zimbabwe Women,
+299037,bangladesh-women,Bangladesh Women,
+299041,thailand-women,Thailand Women,/lsci/db/PICTURES/CMS/313400/313402.logo.png
+335970,royal-challengers-bengaluru,Royal Challengers Bengaluru,
+335971,kolkata-knight-riders,Kolkata Knight Riders,/lsci/db/PICTURES/CMS/313400/313419.logo.png
+335973,punjab-kings,Punjab Kings,/lsci/db/PICTURES/CMS/414800/414846.png
+335974,chennai-super-kings,Chennai Super Kings,/lsci/db/PICTURES/CMS/313400/313421.logo.png
+335975,delhi-capitals,Delhi Capitals,/lsci/db/PICTURES/CMS/313400/313422.logo.png
+335977,rajasthan-royals,Rajasthan Royals,
+335978,mumbai-indians,Mumbai Indians,
+509667,adelaide-strikers,Adelaide Strikers,/lsci/db/PICTURES/CMS/313400/313465.logo.png
+509668,brisbane-heat,Brisbane Heat,/lsci/db/PICTURES/CMS/313400/313466.logo.png
+509669,hobart-hurricanes,Hobart Hurricanes,/lsci/db/PICTURES/CMS/313400/313467.logo.png
+509670,perth-scorchers,Perth Scorchers,/lsci/db/PICTURES/CMS/313400/313468.logo.png
+509671,melbourne-renegades,Melbourne Renegades,/lsci/db/PICTURES/CMS/313400/313469.logo.png
+509672,melbourne-stars,Melbourne Stars,/lsci/db/PICTURES/CMS/313400/313470.logo.png
+509673,sydney-sixers,Sydney Sixers,/lsci/db/PICTURES/CMS/313400/313471.logo.png
+509674,sydney-thunder,Sydney Thunder,/lsci/db/PICTURES/CMS/313400/313472.logo.png
+599860,rangpur-riders,Rangpur Riders,
+628333,sunrisers-hyderabad,Sunrisers Hyderabad,/lsci/db/PICTURES/CMS/414800/414845.png
+642411,barbados-royals,Barbados Royals,
+642413,guyana-amazon-warriors,Guyana Amazon Warriors,
+642415,jamaica-tallawahs,Jamaica Tallawahs,
+642417,saint-lucia-kings,Saint Lucia Kings,
+642421,trinbago-knight-riders,Trinbago Knight Riders,
+857687,st-kitts-and-nevis-patriots,St Kitts And Nevis Patriots,/lsci/db/PICTURES/CMS/313500/313501.logo.png
+896397,brisbane-heat-women,Brisbane Heat Women,/lsci/db/PICTURES/CMS/313500/313503.logo.png
+896399,melbourne-stars-women,Melbourne Stars Women,/lsci/db/PICTURES/CMS/313500/313504.logo.png
+896401,sydney-thunder-women,Sydney Thunder Women,/lsci/db/PICTURES/CMS/313500/313505.logo.png
+896403,sydney-sixers-women,Sydney Sixers Women,/lsci/db/PICTURES/CMS/313500/313506.logo.png
+896405,perth-scorchers-women,Perth Scorchers Women,/lsci/db/PICTURES/CMS/313500/313507.logo.png
+896407,melbourne-renegades-women,Melbourne Renegades Women,/lsci/db/PICTURES/CMS/313500/313508.logo.png
+896431,adelaide-strikers-women,Adelaide Strikers Women,/lsci/db/PICTURES/CMS/313500/313509.logo.png
+896433,hobart-hurricanes-women,Hobart Hurricanes Women,/lsci/db/PICTURES/CMS/313500/313510.logo.png
+935277,comilla-victorians,Comilla Victorians,/lsci/db/PICTURES/CMS/333600/333684.png
+942833,chattogram-challengers,Chattogram Challengers,
+942837,dhaka-dominators,Dhaka Dominators,
+953833,peshawar-zalmi,Peshawar Zalmi,/lsci/db/PICTURES/CMS/313500/313519.logo.png
+953835,karachi-kings,Karachi Kings,/lsci/db/PICTURES/CMS/313500/313520.logo.png
+953843,islamabad-united,Islamabad United,/lsci/db/PICTURES/CMS/313500/313521.logo.png
+953845,quetta-gladiators,Quetta Gladiators,/lsci/db/PICTURES/CMS/313500/313522.logo.png
+953847,lahore-qalandars,Lahore Qalandars,/lsci/db/PICTURES/CMS/313500/313523.logo.png
+1060323,khulna-tigers,Khulna Tigers,/lsci/db/PICTURES/CMS/313500/313536.logo.png
+1117814,multan-sultans,Multan Sultans,
+1121244,sylhet-strikers,Sylhet Strikers,/lsci/db/PICTURES/CMS/352100/352112.png
+1133698,sharjah-warriorz,Sharjah Warriorz,/lsci/db/PICTURES/CMS/394600/394631.png
+1204494,trent-rockets-men,Trent Rockets Men,
+1204495,southern-brave-men,Southern Brave Men,
+1204496,sunrisers-leeds-men,Sunrisers Leeds Men,
+1204497,welsh-fire-men,Welsh Fire Men,
+1204498,mi-london-men,MI London Men,
+1204499,manchester-super-giants-men,Manchester Super Giants Men,
+1204500,london-spirit-men,London Spirit Men,
+1204501,birmingham-phoenix-men,Birmingham Phoenix Men,
+1208116,birmingham-phoenix-women,Birmingham Phoenix Women,
+1208118,manchester-super-giants-women,Manchester Super Giants Women,
+1208119,london-spirit-women,London Spirit Women,
+1208120,sunrisers-leeds-women,Sunrisers Leeds Women,
+1208121,southern-brave-women,Southern Brave Women,
+1208122,mi-london-women,MI London Women,
+1208123,trent-rockets-women,Trent Rockets Women,
+1208124,welsh-fire-women,Welsh Fire Women,
+1239299,fortune-barishal,Fortune Barishal,
+1298768,lucknow-super-giants,Lucknow Super Giants,
+1298769,gujarat-titans,Gujarat Titans,/lsci/db/PICTURES/CMS/334700/334707.png
+1328786,mi-cape-town,MI Cape Town,
+1328788,mi-emirates,MI Emirates,
+1335270,joburg-super-kings,Joburg Super Kings,/lsci/db/PICTURES/CMS/348900/348949.png
+1335271,pretoria-capitals,Pretoria Capitals,/lsci/db/PICTURES/CMS/411100/411152.png
+1335272,durban-s-super-giants,Durban's Super Giants,
+1335273,sunrisers-eastern-cape,Sunrisers Eastern Cape,/lsci/db/PICTURES/CMS/348900/348952.png
+1335274,paarl-royals,Paarl Royals,
+1346027,abu-dhabi-knight-riders,Abu Dhabi Knight Riders,/lsci/db/PICTURES/CMS/349600/349617.png
+1346029,dubai-capitals,Dubai Capitals,/lsci/db/PICTURES/CMS/411100/411155.png
+1346030,gulf-giants,Gulf Giants,/lsci/db/PICTURES/CMS/411100/411154.png
+1346066,desert-vipers,Desert Vipers,/lsci/db/PICTURES/CMS/411100/411156.png
+1358720,mumbai-indians-women,Mumbai Indians Women,
+1358721,delhi-capitals-women,Delhi Capitals Women,
+1358722,gujarat-giants-women,Gujarat Giants Women,
+1358723,royal-challengers-bengaluru-women,Royal Challengers Bengaluru Women,
+1358724,up-warriorz-women,Up Warriorz Women,
+1381353,texas-super-kings,Texas Super Kings,/lsci/db/PICTURES/CMS/361700/361794.png
+1381354,los-angeles-knight-riders,Los Angeles Knight Riders,/lsci/db/PICTURES/CMS/361700/361790.png
+1381355,mi-new-york,MI New York,/lsci/db/PICTURES/CMS/361700/361791.png
+1381357,san-francisco-unicorns,San Francisco Unicorns,/lsci/db/PICTURES/CMS/361700/361792.png
+1381359,seattle-orcas,Seattle Orcas,/lsci/db/PICTURES/CMS/361700/361793.png
+1381360,washington-freedom,Washington Freedom,/lsci/db/PICTURES/CMS/384300/384315.jpg
+1428675,antigua-and-barbuda-falcons,Antigua And Barbuda Falcons,/lsci/db/PICTURES/CMS/379000/379075.png
