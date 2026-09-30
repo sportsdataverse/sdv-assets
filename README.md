@@ -17,9 +17,9 @@ mark after its source changes.
 | Column | Meaning |
 |---|---|
 | `level` | `team`, `division`, `conference`, `league` |
-| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `milb` |
+| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb` |
 | `entity_id`, `entity_name` | The source's id and name for the team, group or league |
-| `program` | `pro`, `football`, `mens`, `womens` (Tennessee's Lady Vols mark is a `womens` row), `junior` (OHL/WHL/QMJHL), and the MiLB level (`aaa`, `aa`, `high_a`, `single_a`, `short_a`, `rookie`) |
+| `program` | `pro`, `football`, `mens`, `womens` (Tennessee's Lady Vols mark is a `womens` row), `junior` (OHL/WHL/QMJHL/USHL), and the MiLB level (`aaa`, `aa`, `high_a`, `single_a`, `short_a`, `rookie`) |
 | `mark_type`, `variant` | `logo` / `wordmark`; `default`, `dark`, the ESPN brand-set variants, `on_light` / `on_dark`, … |
 | `valid_from`, `valid_to` | Seasons the source says the mark was used, where it says so (the NHL catalog, HockeyTech and ESPN's XFL/UFL season lists do); blank otherwise |
 | `source`, `url` | Where it was captured from |
@@ -38,9 +38,12 @@ Official sources only:
 - MLB's CDN: team logos and wordmarks, American and National League marks.
 - nflverse's team table: wordmarks and conference/league marks.
 - ESPN soccer: every club in every competition ESPN lists (219 on 2026-09-30).
-- ESPN's XFL (2020, 2023) and UFL (2024 on) team lists by season.
+- ESPN's XFL (2020, 2023) and UFL (2024 on) team lists by season, captured from ESPN's per-league files (`xfl/500/dal.png`).
+  ESPN overwrites a file when a team rebrands or its abbreviation passes to another team, so a file's season range covers
+  only the identity that last used it (a logo replaced under the same name and abbreviation cannot be detected).
 - Fox: USFL (2022-23) team logos. Fox owned the league.
-- HockeyTech, the stats platform the leagues' own sites use: PWHL, AHL, OHL, WHL and QMJHL logos for every regular season.
+- HockeyTech, the stats platform the leagues' own sites use: PWHL, AHL, OHL, WHL, QMJHL and USHL logos for every regular season.
+- The ECHL's own teams page: current logos (the ECHL's HockeyTech key is not public, so no history yet).
 - MLB's CDN for minor-league teams: every team the Stats API lists at any level since 2005 (current marks only).
 
 Non-free Wikipedia files and third-party logo sites (sportslogos.net, Sports Reference) are never captured here.
