@@ -23,8 +23,8 @@ cricinfo_id,slug,name,cricinfo_logo
 238,australia-women,Australia Women,
 975,england-women,England Women,
 1812,india-women,India Women,
-2234,ireland-women,Ireland Women,
-2410,netherlands-women,Netherlands Women,
+2234,ireland-women,Ireland Women,/lsci/db/PICTURES/CMS/156800/156800.png
+2410,netherlands-women,Netherlands Women,/lsci/db/PICTURES/CMS/313100/313136.logo.png
 2563,new-zealand-women,New Zealand Women,
 2971,pakistan-women,Pakistan Women,
 3328,south-africa-women,South Africa Women,
@@ -107,9 +107,9 @@ cricinfo_id,slug,name,cricinfo_logo
 1346030,gulf-giants,Gulf Giants,/lsci/db/PICTURES/CMS/411100/411154.png
 1346066,desert-vipers,Desert Vipers,/lsci/db/PICTURES/CMS/411100/411156.png
 1358720,mumbai-indians-women,Mumbai Indians Women,
-1358721,delhi-capitals-women,Delhi Capitals Women,
-1358722,gujarat-giants-women,Gujarat Giants Women,
-1358723,royal-challengers-bengaluru-women,Royal Challengers Bengaluru Women,
+1358721,delhi-capitals-women,Delhi Capitals Women,/lsci/db/PICTURES/CMS/313400/313422.logo.png
+1358722,gujarat-giants-women,Gujarat Giants Women,/lsci/db/PICTURES/CMS/355500/355583.png
+1358723,royal-challengers-bengaluru-women,Royal Challengers Bengaluru Women,/lsci/db/PICTURES/CMS/378000/378049.png
 1358724,up-warriorz-women,Up Warriorz Women,
 1381353,texas-super-kings,Texas Super Kings,/lsci/db/PICTURES/CMS/361700/361794.png
 1381354,los-angeles-knight-riders,Los Angeles Knight Riders,/lsci/db/PICTURES/CMS/361700/361790.png
