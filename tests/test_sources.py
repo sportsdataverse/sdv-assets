@@ -175,3 +175,23 @@ def test_phf_rows_point_at_wayback_originals_with_season_ranges():
     ]
     assert any(r["mark_type"] == "wordmark" for r in rows)  # the Beauts script
     assert any(r["valid_from"] is None for r in rows)  # files no schedule dates (2020 Toronto Six, Whale alternate)
+
+
+def test_ncaa_com_matching_is_exact_after_ap_abbreviations():
+    index = {}
+    for slug, name in [("fla-southern", "Fla. Southern"), ("southern-nh", "Southern N.H."), ("bethany-ks", "Bethany (KS)"),
+                       ("bethany-wv", "Bethany (WV)"), ("baker", "Baker")]:
+        index.setdefault(sources._school_key(name), set()).add(slug)
+    assert sources._ncaa_slug("Florida Southern", index) == "fla-southern"
+    assert sources._ncaa_slug("Southern New Hampshire", index) == "southern-nh"
+    assert sources._ncaa_slug("Bethany (KS)", index) == "bethany-ks"
+    assert sources._ncaa_slug("Bethany", index) is None  # never guesses between the two Bethanys
+    assert sources._ncaa_slug("Baker University", index) == "baker"  # trailing University dropped, still unique
+    assert sources._ncaa_slug("Arizona Christian", index) is None
+
+
+def test_wayback_marks_point_at_archived_originals():
+    rows = sources.wayback_marks(None)
+    dragons = [r for r in rows if r["entity_name"] == "Seattle Dragons"]
+    assert dragons and dragons[0]["url"].startswith("https://web.archive.org/web/") and "id_/" in dragons[0]["url"]
+    assert (dragons[0]["valid_from"], dragons[0]["valid_to"]) == (2020, 2020)

@@ -48,6 +48,9 @@ Official sources only:
 - Cricket: ESPN's CDN by ESPNcricinfo team id, plus ESPNcricinfo's own image of each team's mark (variant `cricinfo`),
   for the teams in `curated/cricinfo_teams.csv` (national sides and T20 franchises; ESPN's and Cricinfo's APIs refuse
   the droplet, so the list is curated from Cricinfo pages archived by the Wayback Machine).
+- NCAA.com's school logos for college teams ESPN lists with no logo (mostly NCAA Division II/III), matched to NCAA.com's
+  school index by exact normalized name.
+- Overwritten official files from their Wayback Machine copies (`curated/wayback_marks.csv`, e.g. the 2020 Seattle Dragons).
 - PHF/NWHL (2016-23), from the Wayback Machine's copies because both hosts are gone: the inaugural 2016 marks from the
   league's own 2015-16 site (nwhl.co), and the ShiftStats files for 2017 on, with the seasons fastRhockey-data's schedule
   used each in (`curated/phf_logos.csv`).

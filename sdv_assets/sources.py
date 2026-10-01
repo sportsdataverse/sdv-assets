@@ -7,6 +7,7 @@ Seasons follow SDV conventions: ending year for NHL / NBA / MBB / WBB, single or
 
 from __future__ import annotations
 
+import collections
 import csv
 import datetime as dt
 import io
@@ -656,6 +657,90 @@ def phf_wayback(session):
     return out
 
 
+# AP-style state and word abbreviations NCAA.com uses in school names ("Fla. Southern", "Southern N.H.", "American Int'l")
+_AP = {"ala": "alabama", "ariz": "arizona", "ark": "arkansas", "calif": "california", "colo": "colorado", "conn": "connecticut",
+       "del": "delaware", "fla": "florida", "ga": "georgia", "ill": "illinois", "ind": "indiana", "kan": "kansas", "ky": "kentucky",
+       "la": "louisiana", "md": "maryland", "mass": "massachusetts", "me": "maine", "mich": "michigan", "minn": "minnesota",
+       "miss": "mississippi", "mo": "missouri", "mont": "montana", "neb": "nebraska", "nev": "nevada", "nh": "newhampshire",
+       "nj": "newjersey", "nm": "newmexico", "ny": "newyork", "nc": "northcarolina", "nd": "northdakota", "okla": "oklahoma",
+       "ore": "oregon", "pa": "pennsylvania", "ri": "rhodeisland", "sc": "southcarolina", "sd": "southdakota", "tenn": "tennessee",
+       "tex": "texas", "vt": "vermont", "va": "virginia", "wash": "washington", "wva": "westvirginia", "wis": "wisconsin",
+       "wyo": "wyoming", "intl": "international", "univ": "university", "mt": "mount"}
+
+
+def _school_key(name):
+    """A school name reduced for exact matching: case, punctuation, AP abbreviations and State/St./Saint folded."""
+    s = name.lower().replace("&", " and ").replace("'", "").replace("saint ", "st ")
+    s = re.sub(r"\b([a-z])\.\s*([a-z])\.", r"\1\2", s)  # "N.H." -> "nh"
+    words = [_AP.get(w, w) for w in re.split(r"[^a-z0-9]+", s) if w]
+    return "".join("st" if w in ("state", "st", "saint") else w for w in words)
+
+
+def _ncaa_slug(location, index):
+    """The NCAA.com slug for an ESPN team location, or None. Exact key match only (no fuzzy matching: "Bethany (KS)"
+    and "Bethany (WV)" are different schools); a trailing University/College is dropped only if that still matches
+    exactly one school."""
+    for name in (location, re.sub(r"\s+(university|college)$", "", location.strip(), flags=re.I)):
+        hits = index.get(_school_key(name), set())
+        if len(hits) == 1:
+            return next(iter(hits))
+        if hits:
+            return None
+    return None
+
+
+# College lists whose logo-less teams NCAA.com can cover: (sdv league, ESPN sport, ESPN league, program)
+NCAA_COM_LEAGUES = [
+    ("cfb", "football", "college-football", "football"),
+    ("ncaa_baseball", "baseball", "college-baseball", "mens"),
+    ("ncaa_softball", "baseball", "college-softball", "womens"),
+    ("ncaa_mhockey", "hockey", "mens-college-hockey", "mens"),
+    ("ncaa_whockey", "hockey", "womens-college-hockey", "womens"),
+    ("soccer", "soccer", "usa.ncaa.m.1", None),
+    ("soccer", "soccer", "usa.ncaa.w.1", None),
+]
+
+
+def ncaa_com(session):
+    """NCAA.com's school logo (``logos/schools/bgl/{slug}.svg``) for college teams ESPN lists with no logo at all, mostly
+    NCAA Division II and III programs. Keyed by the ESPN team id so the row sits beside that league's ESPN rows. NAIA,
+    junior-college and Canadian teams are not NCAA members and stay uncovered."""
+    index, page, last = collections.defaultdict(set), 0, 0
+    while page <= last:
+        r = session.get(f"https://www.ncaa.com/schools-index/{page}", headers=UA, timeout=60)
+        r.raise_for_status()
+        last = max([last] + [int(p) for p in re.findall(r"/schools-index/(\d+)", r.text)])
+        for slug, name in re.findall(r'href="/schools/([a-z0-9-]+)"[^>]*>([^<]{2,80})<', r.text):
+            index[_school_key(name)].add(slug)
+        page += 1
+    if len(index) < 500:
+        raise RuntimeError(f"ncaa_com: the NCAA.com school index returned only {len(index)} schools")
+    out = []
+    for league, sport, espn_league, program in NCAA_COM_LEAGUES:
+        for t in _espn_site_teams(session, sport, espn_league):
+            if t.get("logos"):
+                continue
+            slug = _ncaa_slug(t.get("location") or t.get("displayName") or "", index)
+            if slug:
+                url = f"https://www.ncaa.com/sites/default/files/images/logos/schools/bgl/{slug}.svg"
+                out.append(row("team", league, t["id"], t.get("displayName"), url, "ncaa.com", program=program))
+    return out
+
+
+def wayback_marks(session):
+    """Official files that were overwritten or taken down, from the Wayback Machine's ``id_`` copy of the original URL
+    (``curated/wayback_marks.csv``: one row per file, each checked by eye, with why the live URL no longer serves it)."""
+    out = []
+    with open(CURATED / "wayback_marks.csv", newline="") as f:
+        for t in csv.DictReader(f):
+            out.append(
+                row("team", t["league"], t["entity_id"], t["name"], t["wayback"], "wayback", variant=t["variant"], program="pro",
+                    valid_from=int(t["valid_from"]) if t["valid_from"] else None,
+                    valid_to=int(t["valid_to"]) if t["valid_to"] else None)
+            )
+    return out
+
+
 SOURCES = [
-    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback,
+    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback, ncaa_com, wayback_marks,
 ]
