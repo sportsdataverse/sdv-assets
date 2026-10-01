@@ -163,3 +163,11 @@ def test_aaf_crops_are_marked_derived_and_keyed_by_pff_franchise_id():
     assert [r["entity_id"] for r in crops] == [str(i) for i in range(719, 727)]  # PFF ids, strip order
     assert crops[6]["entity_name"] == "San Antonio Commanders"
     assert all(sources.AAF_CROPS_COMMIT in r["url"] for r in crops)
+
+
+def test_phf_rows_point_at_wayback_originals_with_season_ranges():
+    rows = sources.phf_wayback(None)
+    assert rows and all(r["url"].startswith("https://web.archive.org/web/") and "id_/" in r["url"] for r in rows)
+    pride = [r for r in rows if r["entity_name"] == "Boston Pride"]
+    assert [(r["valid_from"], r["valid_to"]) for r in pride] == [(2017, 2023)]
+    assert any(r["valid_from"] is None for r in rows)  # the 2020 Toronto Six file no schedule used

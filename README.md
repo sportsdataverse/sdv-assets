@@ -17,7 +17,7 @@ mark after its source changes.
 | Column | Meaning |
 |---|---|
 | `level` | `team`, `division`, `conference`, `league` |
-| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket`, `aaf` |
+| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket`, `aaf`, `nbagl`, `ncaa_baseball`, `ncaa_softball`, `ncaa_mhockey`, `ncaa_whockey`, `phf` |
 | `entity_id`, `entity_name` | The source's id and name for the team, group or league |
 | `program` | `pro`, `football`, `mens`, `womens` (Tennessee's Lady Vols mark is a `womens` row), `junior` (OHL/WHL/QMJHL/USHL), and the MiLB level (`aaa`, `aa`, `high_a`, `single_a`, `short_a`, `rookie`) |
 | `mark_type`, `variant` | `logo` / `wordmark`; `default`, `dark`, the ESPN brand-set variants, `on_light` / `on_dark`, … |
@@ -38,6 +38,8 @@ Official sources only:
 - MLB's CDN: team logos and wordmarks, American and National League marks.
 - nflverse's team table: wordmarks and conference/league marks.
 - ESPN soccer: every club in every competition ESPN lists (219 on 2026-09-30).
+- ESPN's NBA G League, college baseball, college softball (filed under baseball) and men's/women's college hockey team lists.
+  ESPN keeps one id per school across its college sports, so these share images with `cfb`/`mbb`/`wbb`.
 - ESPN's XFL (2020, 2023) and UFL (2024 on) team lists by season, captured from ESPN's per-league files (`xfl/500/dal.png`).
   ESPN overwrites a file when a team rebrands or its abbreviation passes to another team, so a file's season range covers
   only the identity that last used it (a logo replaced under the same name and abbreviation cannot be detected).
@@ -46,6 +48,8 @@ Official sources only:
 - Cricket: ESPN's CDN by ESPNcricinfo team id, plus ESPNcricinfo's own image of each team's mark (variant `cricinfo`),
   for the teams in `curated/cricinfo_teams.csv` (national sides and T20 franchises; ESPN's and Cricinfo's APIs refuse
   the droplet, so the list is curated from Cricinfo pages archived by the Wayback Machine).
+- PHF/NWHL (2016-23): the league's ShiftStats logo files, which are gone from their host, from the Wayback Machine's copies,
+  with the seasons fastRhockey-data's schedule used each in (`curated/phf_logos.csv`; the 2016 originals were never archived).
 - AAF (2019): aaf.com's archived strip of all eight logos, plus eight crops of it marked `source=aaf-strip-crop`,
   `variant=crop_64px` (owner-approved; no separate official files survive; see `curated/aaf/README.md`).
 - MLB's CDN for minor-league teams: every team the Stats API lists at any level since 2005 (current marks only).

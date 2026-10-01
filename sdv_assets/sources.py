@@ -30,6 +30,12 @@ ESPN_LEAGUES = [
     ("mbb", "basketball", "mens-college-basketball", "mens"),
     ("wbb", "basketball", "womens-college-basketball", "womens"),
     ("ufl", "football", "ufl", "pro"),
+    ("nbagl", "basketball", "nba-development", "pro"),
+    # ESPN keeps one id per school across its college sports, so these share images with cfb/mbb/wbb where a school plays both
+    ("ncaa_baseball", "baseball", "college-baseball", "mens"),
+    ("ncaa_softball", "baseball", "college-softball", "womens"),  # ESPN files college softball under baseball
+    ("ncaa_mhockey", "hockey", "mens-college-hockey", "mens"),
+    ("ncaa_whockey", "hockey", "womens-college-hockey", "womens"),
 ]
 
 # Division I programs ESPN's teams lists leave out (see sdvplotR data-raw/generate_logo_ref.R)
@@ -634,6 +640,21 @@ def aaf_strip(session):
     return out
 
 
+def phf_wayback(session):
+    """PHF/NWHL (2016-2023) logos. Their host, img.shiftstats.com (the league's stats vendor), no longer resolves, so
+    each file is the Wayback Machine's copy (``id_`` = the original bytes). ``curated/phf_logos.csv`` maps each file to
+    the seasons fastRhockey-data's schedule used it in; the four 2016 originals were never archived."""
+    out = []
+    with open(CURATED / "phf_logos.csv", newline="") as f:
+        for t in csv.DictReader(f):
+            out.append(
+                row("team", "phf", t["logo_id"], t["name"], t["wayback"], "shiftstats", variant=t["size"], program="pro",
+                    valid_from=int(t["valid_from"]) if t["valid_from"] else None,
+                    valid_to=int(t["valid_to"]) if t["valid_to"] else None)
+            )
+    return out
+
+
 SOURCES = [
-    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip,
+    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback,
 ]
