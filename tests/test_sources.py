@@ -169,5 +169,9 @@ def test_phf_rows_point_at_wayback_originals_with_season_ranges():
     rows = sources.phf_wayback(None)
     assert rows and all(r["url"].startswith("https://web.archive.org/web/") and "id_/" in r["url"] for r in rows)
     pride = [r for r in rows if r["entity_name"] == "Boston Pride"]
-    assert [(r["valid_from"], r["valid_to"]) for r in pride] == [(2017, 2023)]
-    assert any(r["valid_from"] is None for r in rows)  # the 2020 Toronto Six file no schedule used
+    assert sorted((r["valid_from"], r["valid_to"], r["source"]) for r in pride) == [
+        (2016, 2016, "nwhl.co"),  # the inaugural mark, from the league's own 2015-16 site
+        (2017, 2023, "shiftstats"),
+    ]
+    assert any(r["mark_type"] == "wordmark" for r in rows)  # the Beauts script
+    assert any(r["valid_from"] is None for r in rows)  # files no schedule dates (2020 Toronto Six, Whale alternate)

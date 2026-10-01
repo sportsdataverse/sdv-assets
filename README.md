@@ -48,8 +48,9 @@ Official sources only:
 - Cricket: ESPN's CDN by ESPNcricinfo team id, plus ESPNcricinfo's own image of each team's mark (variant `cricinfo`),
   for the teams in `curated/cricinfo_teams.csv` (national sides and T20 franchises; ESPN's and Cricinfo's APIs refuse
   the droplet, so the list is curated from Cricinfo pages archived by the Wayback Machine).
-- PHF/NWHL (2016-23): the league's ShiftStats logo files, which are gone from their host, from the Wayback Machine's copies,
-  with the seasons fastRhockey-data's schedule used each in (`curated/phf_logos.csv`; the 2016 originals were never archived).
+- PHF/NWHL (2016-23), from the Wayback Machine's copies because both hosts are gone: the inaugural 2016 marks from the
+  league's own 2015-16 site (nwhl.co), and the ShiftStats files for 2017 on, with the seasons fastRhockey-data's schedule
+  used each in (`curated/phf_logos.csv`).
 - AAF (2019): aaf.com's archived strip of all eight logos, plus eight crops of it marked `source=aaf-strip-crop`,
   `variant=crop_64px` (owner-approved; no separate official files survive; see `curated/aaf/README.md`).
 - MLB's CDN for minor-league teams: every team the Stats API lists at any level since 2005 (current marks only).
