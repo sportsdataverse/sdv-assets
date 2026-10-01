@@ -641,14 +641,15 @@ def aaf_strip(session):
 
 
 def phf_wayback(session):
-    """PHF/NWHL (2016-2023) logos. Their host, img.shiftstats.com (the league's stats vendor), no longer resolves, so
-    each file is the Wayback Machine's copy (``id_`` = the original bytes). ``curated/phf_logos.csv`` maps each file to
-    the seasons fastRhockey-data's schedule used it in; the four 2016 originals were never archived."""
+    """PHF/NWHL (2016-2023) logos, each the Wayback Machine's copy (``id_`` = the original bytes) because both hosts are
+    gone: the league's 2015-16 site nwhl.co (the inaugural 2016 marks) and img.shiftstats.com, its stats vendor (2017 on,
+    with the seasons fastRhockey-data's schedule used each file in). See ``curated/phf_logos.csv``."""
     out = []
     with open(CURATED / "phf_logos.csv", newline="") as f:
         for t in csv.DictReader(f):
             out.append(
-                row("team", "phf", t["logo_id"], t["name"], t["wayback"], "shiftstats", variant=t["size"], program="pro",
+                row("team", "phf", t["logo_id"], t["name"], t["wayback"], t["source"], variant=t["variant"],
+                    mark_type=t["mark_type"], program="pro",
                     valid_from=int(t["valid_from"]) if t["valid_from"] else None,
                     valid_to=int(t["valid_to"]) if t["valid_to"] else None)
             )
