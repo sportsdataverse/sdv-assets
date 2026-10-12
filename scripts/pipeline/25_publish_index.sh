@@ -4,8 +4,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 OUT="${SDV_ASSETS_INDEX_OUT:-build/index}"
+case "$OUT" in ""|/|.|..) echo "refusing to clear OUT=$OUT" >&2; exit 1 ;; esac
+case "$(realpath -m "$OUT")" in "$(pwd)"/?*) ;; *) echo "OUT must be under the repo: $OUT" >&2; exit 1 ;; esac
 rm -rf "$OUT"
-ver=$(uv run --extra index python -m sdv_assets.index "$OUT" | tail -n 1)
+ver=$(uv run --frozen --extra index python -m sdv_assets.index "$OUT" | tail -n 1)
 current=$(rclone cat sdvspaces:sdv/assets/public/index/latest.txt 2>/dev/null | tr -d '[:space:]' || true)
 if [ "$current" = "$ver" ]; then
   echo "index $ver already published"
