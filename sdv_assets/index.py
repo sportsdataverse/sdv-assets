@@ -7,6 +7,7 @@ its correctness. Writes <out>/<INDEX_VERSION>/{teams,aliases}.csv.gz and <out>/l
 from __future__ import annotations
 
 import gzip
+import hashlib
 import io
 import re
 import sys
@@ -23,15 +24,33 @@ def fetch(name: str) -> bytes:
         return r.read()
 
 
+def stamp(teams: pl.DataFrame, aliases: pl.DataFrame) -> str:
+    """sdvplot's INDEX_VERSION: the digest of the two frames (tools/build_index.py stamp(), kept identical)."""
+    return hashlib.sha256(
+        (teams.write_csv() + aliases.write_csv()).encode("utf-8")
+    ).hexdigest()[:12]
+
+
 def main(out: Path) -> str:
     ver = fetch("INDEX_VERSION").decode().strip()
     if not re.fullmatch(r"[0-9a-f]{6,64}", ver):
         sys.exit(f"INDEX_VERSION is not a hex version: {ver!r}")
+    frames = {
+        name: pl.read_parquet(io.BytesIO(fetch(f"{name}.parquet")))
+        for name in ("teams", "aliases")
+    }
+    # three separate CDN-cached requests can straddle a sdvplot commit: the version dir is immutable, so its files
+    # must be the ones INDEX_VERSION names (sdvplot tools/build_index.py stamp())
+    got = stamp(frames["teams"], frames["aliases"])
+    if got != ver:
+        sys.exit(
+            f"INDEX_VERSION {ver} does not match the fetched teams + aliases ({got}); rerun once the CDN settles"
+        )
     d = out / ver
     d.mkdir(parents=True, exist_ok=True)
-    for name in ("teams", "aliases"):
-        df = pl.read_parquet(io.BytesIO(fetch(f"{name}.parquet")))
-        with gzip.GzipFile(d / f"{name}.csv.gz", "wb", mtime=0) as f:  # mtime=0: byte-identical reruns
+    for name, df in frames.items():
+        # mtime=0: byte-identical reruns
+        with gzip.GzipFile(d / f"{name}.csv.gz", "wb", mtime=0) as f:
             df.write_csv(f, null_value="")
     (out / "latest.txt").write_text(ver + "\n", encoding="utf-8", newline="\n")
     return ver
