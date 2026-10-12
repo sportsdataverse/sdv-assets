@@ -33,7 +33,8 @@ def main(out: Path) -> str:
         df = pl.read_parquet(io.BytesIO(fetch(f"{name}.parquet")))
         with gzip.GzipFile(d / f"{name}.csv.gz", "wb", mtime=0) as f:  # mtime=0: byte-identical reruns
             df.write_csv(f, null_value="")
-    (out / "latest.txt").write_text(ver + "\n", encoding="utf-8")
+    (out / "latest.txt").write_text(ver + "\n", encoding="utf-8", newline="
+")
     return ver
 
 
