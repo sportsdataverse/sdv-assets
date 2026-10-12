@@ -5,6 +5,9 @@ description = "Capture and archive official team, conference, league and event m
 requires-python = ">=3.11"
 dependencies = ["requests>=2.31", "pillow>=10"]
 
+[project.optional-dependencies]
+index = ["polars>=1.0,<3"]
+
 [dependency-groups]
 dev = ["pytest>=8"]
 

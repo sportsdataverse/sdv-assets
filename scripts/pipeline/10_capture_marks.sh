@@ -14,4 +14,4 @@ if [ -z "${SDV_ASSETS_API_PROXY:-}" ] && [ -f "$HOME/.Renviron" ]; then
   fi
 fi
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/mnt/sdv_repos/.uv-cache}"
-uv run python -m sdv_assets.capture "$@"
+uv run --frozen python -m sdv_assets.capture "$@"
