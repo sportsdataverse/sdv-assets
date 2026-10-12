@@ -7,6 +7,7 @@ appending to `logs/pipeline.log`; each stage logs `STAGE=... DURATION=... EXIT=.
 |---|---|---|---|---|
 | 10 | `scripts/pipeline/10_capture_marks.sh [source ...]` | every run | content-addressed store; manifest merge keeps `first_seen`; validated images aren't decoded again | ~20 min (all sources) |
 | 20 | `scripts/pipeline/20_publish_images.sh` | every run | `--ignore-existing` on sha256 paths; manifest overwritten | ~1 min when few images are new |
+| 25 | `scripts/pipeline/25_publish_index.sh` | every run | version dirs `--ignore-existing`; unchanged `INDEX_VERSION` skips the upload | seconds |
 | 30 | `scripts/pipeline/30_open_manifest_pr.sh` | every run | no manifest change → no PR; an existing dated branch is left alone | seconds |
 
 Run one source by hand: `scripts/pipeline/10_capture_marks.sh nhl_catalog`.
