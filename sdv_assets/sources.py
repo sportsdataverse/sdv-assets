@@ -834,6 +834,8 @@ def wayback_marks(session):
 F1_MEDIA = "https://media.formula1.com"
 # formula1.com's file names for the 2024+ SVGs -> variant: the white mark is for dark backgrounds, the black one for light
 F1_SVG_VARIANTS = [("logo", "default"), ("logowhite", "dark"), ("logoblack", "on_light")]
+# (season, file name) formula1.com never published: every 2024 team's logoblack answers 404 (checked 2026-11-02)
+F1_SVG_MISSING = {(2024, "logoblack")}
 
 
 def f1_media(session):
@@ -841,7 +843,7 @@ def f1_media(session):
     Both paths are season- and slug-keyed, and slugs change with rebrands (Sauber -> ``kicksauber`` -> ``audi``), so the
     season -> constructor -> slug crosswalk is curated (``curated/f1_constructors.csv``; never matched by name). 2024 on:
     ``image/upload/common/f1/{year}/{slug}/{year}{slug}{logo,logowhite,logoblack}``, the original SVG (2024 has no
-    ``logoblack``; capture drops it). 2019-2023: ``content/dam/fom-website/teams/{year}/{slug}-logo.png`` (96 px; the
+    ``logoblack``: ``F1_SVG_MISSING``). 2019-2023: ``content/dam/fom-website/teams/{year}/{slug}-logo.png`` (96 px; the
     2021-23 folders repeat the 2020 files, and each row still carries only its folder's season). Add next season's rows
     when formula1.com's /en/teams page changes."""
     out = []
@@ -849,7 +851,8 @@ def f1_media(session):
         for t in csv.DictReader(f):
             y, slug = int(t["season"]), t["f1_slug"]
             if y >= 2024:
-                urls = [(f"{F1_MEDIA}/image/upload/common/f1/{y}/{slug}/{y}{slug}{name}", v) for name, v in F1_SVG_VARIANTS]
+                urls = [(f"{F1_MEDIA}/image/upload/common/f1/{y}/{slug}/{y}{slug}{name}", v) for name, v in F1_SVG_VARIANTS
+                        if (y, name) not in F1_SVG_MISSING]
             else:
                 urls = [(f"{F1_MEDIA}/content/dam/fom-website/teams/{y}/{slug}-logo.png", "default")]
             for url, variant in urls:

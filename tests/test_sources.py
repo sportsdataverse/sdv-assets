@@ -323,6 +323,8 @@ def test_f1_media_rows_are_keyed_by_jolpica_constructor_id_and_season():
     png = "https://media.formula1.com/content/dam/fom-website/teams"
     assert by[("red_bull", 2019, "default")] == f"{png}/2019/red-bull-racing-logo.png"
     assert ("red_bull", 2019, "dark") not in by  # the pre-2024 path has one PNG per team
+    assert ("ferrari", 2024, "dark") in by and ("ferrari", 2024, "on_light") not in by  # 2024 has no logoblack
+    assert not [u for u in by.values() if "/2024/" in u and u.endswith("logoblack")]  # every one answers 404
     assert by[("sauber", 2024, "default")].endswith("/2024/kicksauber/2024kicksauberlogo")  # slugs follow rebrands
     assert ("sauber", 2026, "default") not in by and ("audi", 2026, "default") in by
     seasons = collections.Counter(r["valid_from"] for r in rows if r["variant"] == "default")
