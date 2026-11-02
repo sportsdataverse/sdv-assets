@@ -263,11 +263,11 @@ def test_nhl_playoff_marks_are_the_conference_final_wordmarks_by_bracket_year(mo
     })
     rows = sources.nhl_playoff_marks(session)
     assert {(r["level"], r["league"], r["entity_id"], r["entity_name"], r["mark_type"], r["variant"]) for r in rows} == {
-        ("conference", "nhl", "EAS", "Eastern Conference", "logo", "conference_final"),
-        ("conference", "nhl", "WES", "Western Conference", "logo", "conference_final"),
+        ("conference", "nhl", "EAS", "Eastern Conference", "wordmark", "conference_final"),
+        ("conference", "nhl", "WES", "Western Conference", "wordmark", "conference_final"),
     }
     assert sorted((r["entity_id"], r["url"].rsplit("/", 1)[1], r["valid_from"], r["valid_to"]) for r in rows) == [
-        ("EAS", "ecf-20232024-wordmark-en.png", 2024, 2026),  # one file, every season the bracket linked it
+        ("EAS", "ecf-20232024-wordmark-en.png", 2024, 2026),  # one row per image: first to last season linked, spanning 2025
         ("EAS", "ecf-wordmark-en.png", 2025, 2025),
         ("WES", "wcf-20232024-wordmark-en.png", 2024, 2026),
         ("WES", "wcf-wordmark-en.png", 2025, 2025),

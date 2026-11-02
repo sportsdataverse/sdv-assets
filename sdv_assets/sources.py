@@ -326,7 +326,8 @@ def nhl_playoff_marks(session, first_season=2024):
     """The Eastern and Western Conference Final wordmarks the NHL's playoff bracket links (``assets.nhle.com/logos/
     playoffs/png/ecf-wordmark-en.png``): the only official NHL conference marks, since neither the NHL's logo catalog
     nor ESPN has a standing conference logo. Seasons are the bracket year; a file the bracket links in several seasons
-    (``ecf-20232024-wordmark-en.png``, 2024 and 2026) is one row spanning them, as in hockeytech."""
+    (``ecf-20232024-wordmark-en.png``, 2024 and 2026) is one row spanning them, as in hockeytech: the manifest has
+    one row per image, so the span covers 2025, whose bracket linked ``ecf-wordmark-en.png``."""
     span = {}
     for year in range(first_season, dt.date.today().year + 2):
         try:
@@ -344,7 +345,8 @@ def nhl_playoff_marks(session, first_season=2024):
     if not span:
         raise RuntimeError("nhl_playoff_marks: no playoff bracket linked a conference final mark")
     return [
-        row("conference", "nhl", entity, name, url, "nhl", variant="conference_final", valid_from=lo, valid_to=hi)
+        row("conference", "nhl", entity, name, url, "nhl", variant="conference_final", mark_type="wordmark",
+            valid_from=lo, valid_to=hi)
         for (entity, name, url), (lo, hi) in span.items()
     ]
 

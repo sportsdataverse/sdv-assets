@@ -21,7 +21,7 @@ mark after its source changes.
 | `entity_id`, `entity_name` | The source's id and name for the team, group or league |
 | `program` | `pro`, `football`, `mens`, `womens` (Tennessee's Lady Vols mark is a `womens` row), `junior` (OHL/WHL/QMJHL/USHL and the junior A leagues), `national` (a `fiba` / `iihf` national team ESPN lists under one id for both genders, or with no gender), and the MiLB level (`aaa`, `aa`, `high_a`, `single_a`, `short_a`, `rookie`) |
 | `mark_type`, `variant` | `logo` / `wordmark`; `default`, `dark`, the ESPN brand-set variants, `on_light` / `on_dark`, … |
-| `valid_from`, `valid_to` | Seasons the source says the mark was used, where it says so (the NHL catalog, HockeyTech and ESPN's XFL/UFL season lists do); blank otherwise |
+| `valid_from`, `valid_to` | Seasons the source says the mark was used, where it says so (the NHL catalog, HockeyTech, the NHL playoff bracket and ESPN's XFL/UFL season lists do); blank otherwise. One row per image, so a file used again after a gap spans the gap |
 | `source`, `url` | Where it was captured from |
 | `sha256`, `ext`, `bytes`, `width`, `height` | The image (SVGs have no pixel size) |
 | `archive_url` | Where the archived copy is served |
@@ -43,7 +43,7 @@ Official sources only:
 - ESPN's NBA G League, college baseball, college softball (filed under baseball) and men's/women's college hockey team lists.
   ESPN keeps one id per school across its college sports, so these share images with `cfb`/`mbb`/`wbb`.
 - ESPN's NBL (Australia) and national teams, pooled into one league per sport: `fiba` (ESPN's FIBA World Cup and men's /
-  women's Olympic basketball lists) and `iihf` (men's and women's Olympic ice hockey). One row per ESPN team id.
+  women's Olympic basketball lists) and `iihf` (men's and women's Olympic ice hockey). One row per ESPN team id and logo.
 - ESPN's XFL (2020, 2023) and UFL (2024 on) team lists by season, captured from ESPN's per-league files (`xfl/500/dal.png`).
   ESPN overwrites a file when a team rebrands or its abbreviation passes to another team, so a file's season range covers
   only the identity that last used it (a logo replaced under the same name and abbreviation cannot be detected).
