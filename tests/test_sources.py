@@ -307,3 +307,74 @@ def test_ncaa_com_uses_curated_slugs_before_the_name_match():
         ("ncaa_mhockey", "126813", "SUNY Morrisville Mustangs", "morrisville-st.svg", "mens"),
         ("ncaa_mhockey", "132633", "Maryville (Mo) Saints", "maryville-mo.svg", "mens"),
     ]
+
+
+def test_cebl_sends_the_hub_key_and_drops_a_defunct_teams_borrowed_icon():
+    logos = "https://storage.googleapis.com/cebl-project.appspot.com"
+    teams = [
+        {"id": 16, "name_en": "Vancouver Bandits", "is_active": True,
+         "logo_url": f"{logos}/logos/vancouver.png", "icon_url": f"{logos}/icons/vancouver.png"},
+        {"id": 54, "name_en": "Fraser Valley Bandits", "is_active": False,  # relocated; shows Vancouver's icon
+         "logo_url": f"{logos}/logos/fraservalley.png", "icon_url": f"{logos}/icons/vancouver.png"},
+        {"id": 53, "name_en": "Guelph Nighthawks", "is_active": False,
+         "logo_url": f"{logos}/logos/guelph.png", "icon_url": f"{logos}/icons/guelph.png"},
+    ]
+    sent = {}
+
+    class Session:
+        def get(self, url, headers=None, **_):
+            assert url == f"{sources.CEBL_API}/teams/"
+            sent.update(headers)
+            return _response(200, teams)
+
+    rows = sources.cebl(Session())
+    assert sent["X-Api-Key"] == sources.CEBL_KEY and sent["Origin"] == sources.CEBL_HUB
+    assert sorted((r["entity_id"], r["variant"], r["url"].split("cebl-project.appspot.com/")[1]) for r in rows) == [
+        ("16", "default", "logos/vancouver.png"),
+        ("16", "icon", "icons/vancouver.png"),
+        ("53", "default", "logos/guelph.png"),
+        ("53", "icon", "icons/guelph.png"),
+        ("54", "default", "logos/fraservalley.png"),
+    ]
+    assert {(r["league"], r["program"], r["source"]) for r in rows} == {("cebl", "pro", "cebl")}
+
+
+def test_easl_rows_are_keyed_by_the_datacore_team_uuid():
+    logo = "https://images.dc.connect.sportradar.com/b1e0z/ac4b69b92e994138a41e668a04993a1a?size=RAW"
+    session = FakeSession({f"{sources.EASL_API}/teams": (200, [
+        {"id": 1, "teamId": "0548e9a7-99e0-11f0-9c0a-a1d6bfd6d57a", "nameFullLocal": "Alvark Tokyo", "logo": logo},
+        {"id": 2, "teamId": "27492b3f-5ada-11ef-86eb-61fb7e764dd2", "nameFullLocal": "Hong Kong Eastern", "logo": None},
+    ])})
+    assert [(r["league"], r["entity_id"], r["entity_name"], r["url"]) for r in sources.easl(session)] == [
+        ("easl", "0548e9a7-99e0-11f0-9c0a-a1d6bfd6d57a", "Alvark Tokyo", logo)
+    ]
+
+
+def test_lba_keys_by_club_id_in_sdv_ending_years_and_ignores_another_seasons_answer(monkeypatch):
+    first = sources.dt.date.today().year - 2
+    monkeypatch.setattr(sources, "LBA_FIRST", first)
+    monkeypatch.setattr(sources, "LBA_DELAY", 0)
+    cdn = "https://lba-media.s3.eu-south-1.amazonaws.com"
+
+    def teams(year, milano_key):
+        return {"cdn_url": cdn, "teams": [
+            {"id": 1700 + year, "name": f"Milano {year}", "year": year, "club_id": 28, "logo_key": milano_key},
+            {"id": 1800 + year, "name": "Cantu", "year": year, "club_id": 12, "logo_key": None},
+        ]}
+
+    answers = {first: teams(first, "aaa"), first + 1: teams(first + 1, "aaa"), first + 2: teams(first + 1, "bbb")}
+
+    class Session:
+        def get(self, url, **_):
+            assert url.startswith(sources.LBA_API)
+            return _response(200, answers[int(url.rsplit("year=", 1)[1])])
+
+    rows = sources.lba(Session())
+    # one file reused for two seasons is one row spanning them; the last year answered for the season before is skipped
+    assert [(r["league"], r["entity_id"], r["entity_name"], r["url"], r["valid_from"], r["valid_to"]) for r in rows] == [
+        ("lba", "28", f"Milano {first + 1}", f"{cdn}/aaa", first + 1, first + 2)
+    ]
+
+
+def test_the_international_basketball_sources_are_registered():
+    assert {sources.cebl, sources.easl, sources.lba} <= set(sources.SOURCES)
