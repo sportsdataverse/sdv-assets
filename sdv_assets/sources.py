@@ -831,6 +831,34 @@ def wayback_marks(session):
     return out
 
 
+F1_MEDIA = "https://media.formula1.com"
+# formula1.com's file names for the 2024+ SVGs -> variant: the white mark is for dark backgrounds, the black one for light
+F1_SVG_VARIANTS = [("logo", "default"), ("logowhite", "dark"), ("logoblack", "on_light")]
+
+
+def f1_media(session):
+    """F1 constructor logos from formula1.com's media CDN, keyed by the Jolpica ``constructor_id`` sdv-py's F1 family uses.
+    Both paths are season- and slug-keyed, and slugs change with rebrands (Sauber -> ``kicksauber`` -> ``audi``), so the
+    season -> constructor -> slug crosswalk is curated (``curated/f1_constructors.csv``; never matched by name). 2024 on:
+    ``image/upload/common/f1/{year}/{slug}/{year}{slug}{logo,logowhite,logoblack}``, the original SVG (2024 has no
+    ``logoblack``; capture drops it). 2019-2023: ``content/dam/fom-website/teams/{year}/{slug}-logo.png`` (96 px; the
+    2021-23 folders repeat the 2020 files, and each row still carries only its folder's season). Add next season's rows
+    when formula1.com's /en/teams page changes."""
+    out = []
+    with open(CURATED / "f1_constructors.csv", newline="") as f:
+        for t in csv.DictReader(f):
+            y, slug = int(t["season"]), t["f1_slug"]
+            if y >= 2024:
+                urls = [(f"{F1_MEDIA}/image/upload/common/f1/{y}/{slug}/{y}{slug}{name}", v) for name, v in F1_SVG_VARIANTS]
+            else:
+                urls = [(f"{F1_MEDIA}/content/dam/fom-website/teams/{y}/{slug}-logo.png", "default")]
+            for url, variant in urls:
+                out.append(row("team", "f1", t["constructor_id"], t["name"], url, "formula1.com", variant=variant,
+                               program="pro", valid_from=y, valid_to=y))
+    return out
+
+
 SOURCES = [
     espn_teams, espn_groups, espn_static, nhl_catalog, nhl_playoff_marks, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback, ncaa_com, wayback_marks,
+    f1_media,
 ]

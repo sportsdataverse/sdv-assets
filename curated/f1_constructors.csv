@@ -1,0 +1,82 @@
+season,constructor_id,name,f1_slug
+2019,alfa,Alfa Romeo,alfa-romeo-racing
+2019,ferrari,Ferrari,ferrari
+2019,haas,Haas F1 Team,haas-f1-team
+2019,mclaren,McLaren,mclaren
+2019,mercedes,Mercedes,mercedes
+2019,racing_point,Racing Point,racing-point
+2019,red_bull,Red Bull,red-bull-racing
+2019,renault,Renault,renault
+2019,toro_rosso,Toro Rosso,toro-rosso
+2019,williams,Williams,williams
+2020,alfa,Alfa Romeo,alfa-romeo-racing
+2020,alphatauri,AlphaTauri,alphatauri
+2020,ferrari,Ferrari,ferrari
+2020,haas,Haas F1 Team,haas-f1-team
+2020,mclaren,McLaren,mclaren
+2020,mercedes,Mercedes,mercedes
+2020,racing_point,Racing Point,racing-point
+2020,red_bull,Red Bull,red-bull-racing
+2020,renault,Renault,renault
+2020,williams,Williams,williams
+2021,alfa,Alfa Romeo,alfa-romeo-racing
+2021,alphatauri,AlphaTauri,alphatauri
+2021,alpine,Alpine F1 Team,alpine
+2021,aston_martin,Aston Martin,aston-martin
+2021,ferrari,Ferrari,ferrari
+2021,haas,Haas F1 Team,haas-f1-team
+2021,mclaren,McLaren,mclaren
+2021,mercedes,Mercedes,mercedes
+2021,red_bull,Red Bull,red-bull-racing
+2021,williams,Williams,williams
+2022,alfa,Alfa Romeo,alfa-romeo
+2022,alphatauri,AlphaTauri,alphatauri
+2022,alpine,Alpine F1 Team,alpine
+2022,aston_martin,Aston Martin,aston-martin
+2022,ferrari,Ferrari,ferrari
+2022,haas,Haas F1 Team,haas-f1-team
+2022,mclaren,McLaren,mclaren
+2022,mercedes,Mercedes,mercedes
+2022,red_bull,Red Bull,red-bull-racing
+2022,williams,Williams,williams
+2023,alfa,Alfa Romeo,alfa-romeo
+2023,alphatauri,AlphaTauri,alphatauri
+2023,alpine,Alpine F1 Team,alpine
+2023,aston_martin,Aston Martin,aston-martin
+2023,ferrari,Ferrari,ferrari
+2023,haas,Haas F1 Team,haas-f1-team
+2023,mclaren,McLaren,mclaren
+2023,mercedes,Mercedes,mercedes
+2023,red_bull,Red Bull,red-bull-racing
+2023,williams,Williams,williams
+2024,alpine,Alpine F1 Team,alpine
+2024,aston_martin,Aston Martin,astonmartin
+2024,ferrari,Ferrari,ferrari
+2024,haas,Haas F1 Team,haas
+2024,mclaren,McLaren,mclaren
+2024,mercedes,Mercedes,mercedes
+2024,rb,RB F1 Team,rb
+2024,red_bull,Red Bull,redbullracing
+2024,sauber,Sauber,kicksauber
+2024,williams,Williams,williams
+2025,alpine,Alpine F1 Team,alpine
+2025,aston_martin,Aston Martin,astonmartin
+2025,ferrari,Ferrari,ferrari
+2025,haas,Haas F1 Team,haasf1team
+2025,mclaren,McLaren,mclaren
+2025,mercedes,Mercedes,mercedes
+2025,rb,RB F1 Team,racingbulls
+2025,red_bull,Red Bull,redbullracing
+2025,sauber,Sauber,kicksauber
+2025,williams,Williams,williams
+2026,alpine,Alpine F1 Team,alpine
+2026,aston_martin,Aston Martin,astonmartin
+2026,audi,Audi,audi
+2026,cadillac,Cadillac F1 Team,cadillac
+2026,ferrari,Ferrari,ferrari
+2026,haas,Haas F1 Team,haasf1team
+2026,mclaren,McLaren,mclaren
+2026,mercedes,Mercedes,mercedes
+2026,rb,RB F1 Team,racingbulls
+2026,red_bull,Red Bull,redbullracing
+2026,williams,Williams,williams
