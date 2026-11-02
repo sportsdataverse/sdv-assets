@@ -150,6 +150,13 @@ def write_csv(path: Path, rows: list[dict], fields: list[str]) -> None:
         w.writerows(rows)
 
 
+def merge_soccer_competitions(path: Path, rows: list[dict]) -> None:
+    """Add this run's club-competition memberships to the file. Earlier seasons stay, so it builds a history the way
+    marks.csv does; a row seen again replaces the old one (ESPN may rename a competition)."""
+    merged = {(r["competition"], r["season"], r["team_id"]): r for r in read_csv(path) + rows}
+    write_csv(path, list(merged.values()), sources.SOCCER_COMPETITION_FIELDS)
+
+
 def main(names: list[str]) -> None:
     today = dt.date.today().isoformat()
     session = requests.Session()
@@ -162,6 +169,8 @@ def main(names: list[str]) -> None:
         rows = src(session)
         print(f"{src.__name__}: {len(rows)} candidate marks", flush=True)
         candidates += rows
+    if sources.soccer_competitions:  # only when espn_soccer ran; a run over other sources leaves the file alone
+        merge_soccer_competitions(MANIFEST / "soccer_competitions.csv", sources.soccer_competitions)
     urls = sorted({r["url"] for r in candidates})
     print(f"fetching {len(urls)} unique URLs with {WORKERS} workers", flush=True)
 
