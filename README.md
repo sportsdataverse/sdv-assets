@@ -17,11 +17,11 @@ mark after its source changes.
 | Column | Meaning |
 |---|---|
 | `level` | `team`, `division`, `conference`, `league` |
-| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket`, `aaf`, `nbagl`, `ncaa_baseball`, `ncaa_softball`, `ncaa_mhockey`, `ncaa_whockey`, `phf` |
+| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket`, `aaf`, `nbagl`, `ncaa_baseball`, `ncaa_softball`, `ncaa_mhockey`, `ncaa_whockey`, `phf`, `nbl`, `fiba`, `iihf`, `sphl`, `chl`, `bchl`, `ajhl`, `sjhl`, `ojhl`, `cchl`, `gojhl`, `mhl`, `nojhl`, `vijhl`, `kijhl`, `mjhl` |
 | `entity_id`, `entity_name` | The source's id and name for the team, group or league |
-| `program` | `pro`, `football`, `mens`, `womens` (Tennessee's Lady Vols mark is a `womens` row), `junior` (OHL/WHL/QMJHL/USHL), and the MiLB level (`aaa`, `aa`, `high_a`, `single_a`, `short_a`, `rookie`) |
+| `program` | `pro`, `football`, `mens`, `womens` (Tennessee's Lady Vols mark is a `womens` row), `junior` (OHL/WHL/QMJHL/USHL and the junior A leagues), `national` (a `fiba` / `iihf` national team ESPN lists under one id for both genders, or with no gender), and the MiLB level (`aaa`, `aa`, `high_a`, `single_a`, `short_a`, `rookie`) |
 | `mark_type`, `variant` | `logo` / `wordmark`; `default`, `dark`, the ESPN brand-set variants, `on_light` / `on_dark`, … |
-| `valid_from`, `valid_to` | Seasons the source says the mark was used, where it says so (the NHL catalog, HockeyTech and ESPN's XFL/UFL season lists do); blank otherwise |
+| `valid_from`, `valid_to` | Seasons the source says the mark was used, where it says so (the NHL catalog, HockeyTech, the NHL playoff bracket and ESPN's XFL/UFL season lists do); blank otherwise. One row per image, so a file used again after a gap spans the gap |
 | `source`, `url` | Where it was captured from |
 | `sha256`, `ext`, `bytes`, `width`, `height` | The image (SVGs have no pixel size) |
 | `archive_url` | Where the archived copy is served |
@@ -35,21 +35,26 @@ starting year elsewhere.
 Official sources only:
 - ESPN's CDN: team logos with every variant ESPN lists, conference logos including legacy files, league marks, and relocated franchises.
 - The NHL's logo catalog: every club and league mark by season range, 1917-18 on.
+- The NHL's playoff bracket: the Eastern / Western Conference Final wordmarks (2024 on), filed as the `EAS` / `WES`
+  conference marks with variant `conference_final`, the only official NHL conference marks published.
 - MLB's CDN: team logos and wordmarks, American and National League marks.
 - nflverse's team table: wordmarks and conference/league marks.
 - ESPN soccer: every club in every competition ESPN lists (219 on 2026-09-30).
 - ESPN's NBA G League, college baseball, college softball (filed under baseball) and men's/women's college hockey team lists.
   ESPN keeps one id per school across its college sports, so these share images with `cfb`/`mbb`/`wbb`.
+- ESPN's NBL (Australia) and national teams, pooled into one league per sport: `fiba` (ESPN's FIBA World Cup and men's /
+  women's Olympic basketball lists) and `iihf` (men's and women's Olympic ice hockey). One row per ESPN team id and logo.
 - ESPN's XFL (2020, 2023) and UFL (2024 on) team lists by season, captured from ESPN's per-league files (`xfl/500/dal.png`).
   ESPN overwrites a file when a team rebrands or its abbreviation passes to another team, so a file's season range covers
   only the identity that last used it (a logo replaced under the same name and abbreviation cannot be detected).
 - Fox: USFL (2022-23) team logos. Fox owned the league.
-- HockeyTech, the stats platform the leagues' own sites use: PWHL, AHL, ECHL, OHL, WHL, QMJHL and USHL logos for every regular season.
+- HockeyTech, the stats platform the leagues' own sites use: PWHL, AHL, ECHL, SPHL, CHL, OHL, WHL, QMJHL, USHL and the
+  junior A leagues (BCHL, AJHL, SJHL, OJHL, CCHL, GOJHL, MHL, NOJHL, VIJHL, KIJHL, MJHL) logos for every regular season.
 - Cricket: ESPN's CDN by ESPNcricinfo team id, plus ESPNcricinfo's own image of each team's mark (variant `cricinfo`),
   for the teams in `curated/cricinfo_teams.csv` (national sides and T20 franchises; ESPN's and Cricinfo's APIs refuse
   the droplet, so the list is curated from Cricinfo pages archived by the Wayback Machine).
 - NCAA.com's school logos for college teams ESPN lists with no logo (mostly NCAA Division II/III), matched to NCAA.com's
-  school index by exact normalized name.
+  school index by exact normalized name, or by a slug pinned in `curated/ncaa_com_slugs.csv`.
 - Overwritten official files from their Wayback Machine copies (`curated/wayback_marks.csv`, e.g. the 2020 Seattle Dragons).
 - PHF/NWHL (2016-23), from the Wayback Machine's copies because both hosts are gone: the inaugural 2016 marks from the
   league's own 2015-16 site (nwhl.co), and the ShiftStats files for 2017 on, with the seasons fastRhockey-data's schedule
