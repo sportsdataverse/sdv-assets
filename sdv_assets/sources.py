@@ -37,6 +37,16 @@ ESPN_LEAGUES = [
     ("ncaa_softball", "baseball", "college-softball", "womens"),  # ESPN files college softball under baseball
     ("ncaa_mhockey", "hockey", "mens-college-hockey", "mens"),
     ("ncaa_whockey", "hockey", "womens-college-hockey", "womens"),
+    ("nbl", "basketball", "nbl", "pro"),
+    # national teams, pooled into one league per sport (named for the sdvplot surface key). ESPN reuses a team id across
+    # these lists: basketball/fiba lists whichever FIBA World Cup is current (the women's in 2026, with the same ids as
+    # womens-olympics-basketball), and the ice hockey lists share one id per country across genders. espn_teams keeps one
+    # row per id; program None takes the program of the other lists, and an id with none or several becomes "national".
+    ("fiba", "basketball", "fiba", None),
+    ("fiba", "basketball", "mens-olympics-basketball", "mens"),
+    ("fiba", "basketball", "womens-olympics-basketball", "womens"),
+    ("iihf", "hockey", "olympics-mens-ice-hockey", "national"),
+    ("iihf", "hockey", "olympics-womens-ice-hockey", "national"),
 ]
 
 # Division I programs ESPN's teams lists leave out (see sdvplotR data-raw/generate_logo_ref.R)
@@ -44,6 +54,7 @@ ESPN_MISSING_IDS = {
     "cfb": [292, 2598],
     "mbb": [2815, 2511, 2598, 88],
     "wbb": [2385, 2598],
+    "ncaa_whockey": [48],  # Delaware
 }
 
 
@@ -92,8 +103,9 @@ def _variant(rel):
 
 
 def espn_teams(session):
-    """Every logo ESPN lists for every team: default, dark, scoreboard and the 12-variant brand sets."""
-    out = []
+    """Every logo ESPN lists for every team: default, dark, scoreboard and the 12-variant brand sets. One row per
+    sdv league, team id and logo, also when the league pools several ESPN lists (see ESPN_LEAGUES)."""
+    pooled = {}  # (league, team id) -> [team, {logo href: logo}, {programs}]
     for league, sport, espn_league, program in ESPN_LEAGUES:
         base = f"https://site.web.api.espn.com/apis/site/v2/sports/{sport}/{espn_league}/teams"
         teams = [
@@ -104,24 +116,32 @@ def espn_teams(session):
         ]
         seen = {str(t["id"]) for t in teams}
         for tid in ESPN_MISSING_IDS.get(league, []):
-            if str(tid) not in seen:
+            if str(tid) not in seen and (league, str(tid)) not in pooled:
                 team = _get_json(session, f"{base}/{tid}").get("team")
                 if team:
                     teams.append(team)
         for t in teams:
+            entry = pooled.setdefault((league, str(t["id"])), [t, {}, set()])
             for logo in t.get("logos", []):
-                out.append(
-                    row(
-                        "team",
-                        league,
-                        t["id"],
-                        t.get("displayName"),
-                        logo["href"],
-                        "espn",
-                        variant=_variant(logo.get("rel", [])),
-                        program=program,
-                    )
+                entry[1].setdefault(logo["href"], logo)
+            if program:
+                entry[2].add(program)
+    out = []
+    for (league, _), (t, logos, programs) in pooled.items():
+        program = next(iter(programs)) if len(programs) == 1 else "national"
+        for logo in logos.values():
+            out.append(
+                row(
+                    "team",
+                    league,
+                    t["id"],
+                    t.get("displayName"),
+                    logo["href"],
+                    "espn",
+                    variant=_variant(logo.get("rel", [])),
+                    program=program,
                 )
+            )
     return out
 
 
@@ -295,6 +315,38 @@ def nhl_catalog(session):
             )
         )
     return out
+
+
+NHL_BRACKET = "https://api-web.nhle.com/v1/playoff-bracket"
+# (bracket series abbreviation, sdv entity id, name). The brackets before 2024 link no conference final mark.
+NHL_CONFERENCE_FINALS = [("ECF", "EAS", "Eastern Conference"), ("WCF", "WES", "Western Conference")]
+
+
+def nhl_playoff_marks(session, first_season=2024):
+    """The Eastern and Western Conference Final wordmarks the NHL's playoff bracket links (``assets.nhle.com/logos/
+    playoffs/png/ecf-wordmark-en.png``): the only official NHL conference marks, since neither the NHL's logo catalog
+    nor ESPN has a standing conference logo. Seasons are the bracket year; a file the bracket links in several seasons
+    (``ecf-20232024-wordmark-en.png``, 2024 and 2026) is one row spanning them, as in hockeytech."""
+    span = {}
+    for year in range(first_season, dt.date.today().year + 2):
+        try:
+            series = _get_json(session, f"{NHL_BRACKET}/{year}").get("series") or []
+        except requests.HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
+                continue  # a season the NHL has no bracket for yet
+            raise
+        logos = {s.get("seriesAbbrev"): s.get("seriesLogo") for s in series}
+        for abbrev, entity, name in NHL_CONFERENCE_FINALS:
+            url = logos.get(abbrev)
+            if url:
+                lo, hi = span.get((entity, name, url), (year, year))
+                span[(entity, name, url)] = (min(lo, year), max(hi, year))
+    if not span:
+        raise RuntimeError("nhl_playoff_marks: no playoff bracket linked a conference final mark")
+    return [
+        row("conference", "nhl", entity, name, url, "nhl", variant="conference_final", valid_from=lo, valid_to=hi)
+        for (entity, name, url), (lo, hi) in span.items()
+    ]
 
 
 MLB_FOLDERS = [
@@ -522,17 +574,35 @@ HOCKEYTECH = [
     ("whl", "whl", "f1aa699db3d81487", _HT_LS, "junior"),
     ("qmjhl", "lhjmq", "f322673b6bcae299", "https://cluster.leaguestat.com/feed/index.php", "junior"),
     ("ushl", "ushl", "e828f89b243dc43f", _HT_LS, "junior"),
-    # the key the ECHL's own site sent from the browser before it moved to server rendering (in 377 Wayback-archived
-    # API calls); validated 2026-10-01 against modulekit/seasons (21 regular seasons, 2006-07 on)
-    ("echl", "echl", "e18cfddba0db3b21", _HT_LS, "pro"),
+    # sdv-py's ECHL key; it returns the same 21 regular seasons (2006-07 on) as e18cfddba0db3b21, the key the ECHL's
+    # own site used to send from the browser
+    ("echl", "echl", "2c2b89ea7345cae8", _HT_LS, "pro"),
+    ("sphl", "sphl", "8fa10d218c49ec96", _HT_LS, "pro"),
+    ("chl", "chl", "ef96ea7d71574f2a", _HT_LS, "pro"),
+    ("bchl", "bchl", "f3ed30007ad2124e", _HT_LS, "junior"),
+    ("ajhl", "ajhl", "cbe60a1d91c44ade", _HT_LS, "junior"),
+    ("sjhl", "sjhl", "2fb5c2e84bf3e4a8", _HT_LS, "junior"),
+    ("ojhl", "ojhl", "cce66dd6bebf4790", _HT_LS, "junior"),
+    ("cchl", "cchl", "b370f3e6c805baf3", _HT_LS, "junior"),
+    ("gojhl", "gojhl", "34b10d4d34d7b59a", _HT_LS, "junior"),
+    ("mhl", "mhl", "4a948e7faf5ee58d", _HT_LS, "junior"),
+    ("nojhl", "nojhl", "c1375ff55168bd71", _HT_LS, "junior"),
+    ("vijhl", "vijhl", "4f1a61df18906b61", _HT_LS, "junior"),
+    ("kijhl", "kijhl", "2589e0f644b1bb71", _HT_LS, "junior"),
+    ("mjhl", "mjhl", "f894c324fe5fd8f0", _HT_LS, "junior"),
 ]
 
 
 def _hockey_season(name):
-    """'2024-25 Regular Season' -> 2025 (hockey seasons are keyed by their ending year); '2024 Regular Season' -> 2024."""
-    m = re.match(r"(\d{4})(-\d{2,4})?", name)
+    """'2024-25 Regular Season' -> 2025 (hockey seasons are keyed by their ending year); '2024 Regular Season' -> 2024.
+    Some junior leagues prefix their code and write the years other ways: 'CCHL 2026-27', 'OJHL 2019/2020', '26-27
+    Regular Season'. 'CCHL Preseason 2026' and '19 Tie Break' stay None."""
+    m = re.match(r"(?:[A-Z]+ )?(?:(\d{4})([-/]\d{2,4})?|\d{2}-(\d{2})\b)", name)
     if not m:
         return None
+    if m.group(3):  # two-digit years name the ending year directly
+        end = int(m.group(3))
+        return end + (1900 if end > 50 else 2000)
     return int(m.group(1)) + (1 if m.group(2) else 0)
 
 
@@ -701,6 +771,17 @@ NCAA_COM_LEAGUES = [
 ]
 
 
+def _ncaa_com_overrides():
+    """(sdv league, ESPN team id) -> (NCAA.com slug, ESPN name) for schools the exact name match can't place, or that
+    ESPN's current team list leaves out (``curated/ncaa_com_slugs.csv``; each slug checked to serve a logo)."""
+    with open(CURATED / "ncaa_com_slugs.csv", newline="") as f:
+        return {(t["league"], t["espn_id"]): (t["slug"], t["name"]) for t in csv.DictReader(f)}
+
+
+def _ncaa_com_url(slug):
+    return f"https://www.ncaa.com/sites/default/files/images/logos/schools/bgl/{slug}.svg"
+
+
 def ncaa_com(session):
     """NCAA.com's school logo (``logos/schools/bgl/{slug}.svg``) for college teams ESPN lists with no logo at all, mostly
     NCAA Division II and III programs. Keyed by the ESPN team id so the row sits beside that league's ESPN rows. NAIA,
@@ -715,15 +796,22 @@ def ncaa_com(session):
         page += 1
     if len(index) < 500:
         raise RuntimeError(f"ncaa_com: the NCAA.com school index returned only {len(index)} schools")
-    out = []
+    overrides, out, listed = _ncaa_com_overrides(), [], set()
     for league, sport, espn_league, program in NCAA_COM_LEAGUES:
         for t in _espn_site_teams(session, sport, espn_league):
+            listed.add((league, str(t["id"])))
             if t.get("logos"):
                 continue
-            slug = _ncaa_slug(t.get("location") or t.get("displayName") or "", index)
+            # a curated slug first, for the schools whose ESPN name the exact match can't place
+            slug = overrides.get((league, str(t["id"])), (None,))[0] or _ncaa_slug(
+                t.get("location") or t.get("displayName") or "", index)
             if slug:
-                url = f"https://www.ncaa.com/sites/default/files/images/logos/schools/bgl/{slug}.svg"
-                out.append(row("team", league, t["id"], t.get("displayName"), url, "ncaa.com", program=program))
+                out.append(row("team", league, t["id"], t.get("displayName"), _ncaa_com_url(slug), "ncaa.com", program=program))
+    # curated teams ESPN's current list leaves out (it still serves them by id, with no logo)
+    programs = {league: program for league, _, _, program in NCAA_COM_LEAGUES}
+    for (league, tid), (slug, name) in overrides.items():
+        if (league, tid) not in listed:
+            out.append(row("team", league, tid, name, _ncaa_com_url(slug), "ncaa.com", program=programs[league]))
     return out
 
 
@@ -742,5 +830,5 @@ def wayback_marks(session):
 
 
 SOURCES = [
-    espn_teams, espn_groups, espn_static, nhl_catalog, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback, ncaa_com, wayback_marks,
+    espn_teams, espn_groups, espn_static, nhl_catalog, nhl_playoff_marks, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback, ncaa_com, wayback_marks,
 ]

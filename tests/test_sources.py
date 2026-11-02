@@ -83,6 +83,13 @@ def test_hockey_seasons_are_keyed_by_their_ending_year():
     assert sources._hockey_season("1999-00 Regular Season") == 2000  # no century slip
     assert sources._hockey_season("2024 Regular Season") == 2024  # PWHL's inaugural, single-year season
     assert sources._hockey_season("All-Star Game") is None
+    # junior leagues' spellings (CCHL, OJHL)
+    assert sources._hockey_season("CCHL 2026-27") == 2027
+    assert sources._hockey_season("OJHL 2019/2020") == 2020
+    assert sources._hockey_season("26-27 Regular Season") == 2027
+    assert sources._hockey_season("OJHL 22-23") == 2023
+    assert sources._hockey_season("CCHL Preseason 2026") is None
+    assert sources._hockey_season("19 Tie Break") is None  # a WHL tiebreaker, not a season
 
 
 def test_fox_logos_resolve_to_the_original_file():
@@ -195,3 +202,108 @@ def test_wayback_marks_point_at_archived_originals():
     dragons = [r for r in rows if r["entity_name"] == "Seattle Dragons"]
     assert dragons and dragons[0]["url"].startswith("https://web.archive.org/web/") and "id_/" in dragons[0]["url"]
     assert (dragons[0]["valid_from"], dragons[0]["valid_to"]) == (2020, 2020)
+
+
+def test_espn_teams_pools_several_espn_lists_into_one_row_per_team_id(monkeypatch):
+    monkeypatch.setattr(sources, "ESPN_LEAGUES", [
+        ("fiba", "basketball", "fiba", None),
+        ("fiba", "basketball", "mens-olympics-basketball", "mens"),
+        ("fiba", "basketball", "womens-olympics-basketball", "womens"),
+        ("iihf", "hockey", "olympics-mens-ice-hockey", "national"),
+        ("iihf", "hockey", "olympics-womens-ice-hockey", "national"),
+        ("ncaa_whockey", "hockey", "womens-college-hockey", "womens"),
+    ])
+    monkeypatch.setattr(sources, "ESPN_MISSING_IDS", {"ncaa_whockey": [48]})
+    site = "https://site.web.api.espn.com/apis/site/v2/sports"
+
+    def flag(tid, name, iso):
+        return {"id": tid, "displayName": name, "logos": [_logo(f"https://a.espncdn.com/i/teamlogos/countries/500/{iso}.png")]}
+
+    aus_w, aus_m, mli = flag(17472, "Australia", "aus"), flag(104882, "Australia", "aus"), flag(83469, "Mali", "mli")
+    usa = flag(79, "United States", "usa")
+    session = FakeSession({
+        # basketball/fiba lists every team twice, and today it is the women's World Cup (Australia's women's id)
+        f"{site}/basketball/fiba/teams?": (200, _teams(aus_w, mli, aus_w, mli)),
+        f"{site}/basketball/mens-olympics-basketball/teams?": (200, _teams(aus_m)),
+        f"{site}/basketball/womens-olympics-basketball/teams?": (200, _teams(aus_w)),
+        f"{site}/hockey/olympics-mens-ice-hockey/teams?": (200, _teams(usa)),
+        f"{site}/hockey/olympics-womens-ice-hockey/teams?": (200, _teams(usa)),  # one id across genders
+        f"{site}/hockey/womens-college-hockey/teams?": (200, _teams()),
+        f"{site}/hockey/womens-college-hockey/teams/48": (200, {"team": {
+            "id": 48, "displayName": "Delaware Blue Hens", "logos": [_logo(f"{sources.ESPN}/ncaa/500/48.png")]}}),
+    })
+    rows = sources.espn_teams(session)
+    assert sorted((r["league"], r["entity_id"], r["program"]) for r in rows) == [
+        ("fiba", "104882", "mens"),
+        ("fiba", "17472", "womens"),  # listed by fiba and womens-olympics: one row, the women's program
+        ("fiba", "83469", "national"),  # only in basketball/fiba, which names no program
+        ("iihf", "79", "national"),
+        ("ncaa_whockey", "48", "womens"),  # Delaware, left out of ESPN's list and fetched by id
+    ]
+
+
+def test_nhl_playoff_marks_are_the_conference_final_wordmarks_by_bracket_year(monkeypatch):
+    png = "https://assets.nhle.com/logos/playoffs/png"
+
+    def bracket(ecf, wcf):
+        return (200, {"series": [
+            {"seriesAbbrev": "R1", "seriesLogo": None},
+            {"seriesAbbrev": "ECF", "seriesLogo": f"{png}/{ecf}"},
+            {"seriesAbbrev": "WCF", "seriesLogo": f"{png}/{wcf}"},
+            {"seriesAbbrev": "SCF", "seriesLogo": f"{png}/SCP Logo.png"},
+        ]})
+
+    old = ("ecf-20232024-wordmark-en.png", "wcf-20232024-wordmark-en.png")
+    session = FakeSession({
+        f"{sources.NHL_BRACKET}/2024": bracket(*old),
+        f"{sources.NHL_BRACKET}/2025": bracket("ecf-wordmark-en.png", "wcf-wordmark-en.png"),
+        f"{sources.NHL_BRACKET}/2026": bracket(*old),  # the 2024 files linked again
+        f"{sources.NHL_BRACKET}/2027": (200, {"series": []}),  # a season whose playoffs haven't started
+        f"{sources.NHL_BRACKET}/": (404, {}),
+    })
+    rows = sources.nhl_playoff_marks(session)
+    assert {(r["level"], r["league"], r["entity_id"], r["entity_name"], r["mark_type"], r["variant"]) for r in rows} == {
+        ("conference", "nhl", "EAS", "Eastern Conference", "logo", "conference_final"),
+        ("conference", "nhl", "WES", "Western Conference", "logo", "conference_final"),
+    }
+    assert sorted((r["entity_id"], r["url"].rsplit("/", 1)[1], r["valid_from"], r["valid_to"]) for r in rows) == [
+        ("EAS", "ecf-20232024-wordmark-en.png", 2024, 2026),  # one file, every season the bracket linked it
+        ("EAS", "ecf-wordmark-en.png", 2025, 2025),
+        ("WES", "wcf-20232024-wordmark-en.png", 2024, 2026),
+        ("WES", "wcf-wordmark-en.png", 2025, 2025),
+    ]
+    with pytest.raises(RuntimeError):  # no linked mark at all fails the source instead of publishing nothing
+        sources.nhl_playoff_marks(FakeSession({f"{sources.NHL_BRACKET}/": (200, {"series": []})}))
+
+
+def test_hockeytech_carries_the_junior_and_minor_leagues_and_sdv_pys_echl_key():
+    by_league = {league: (client, key, program) for league, client, key, _, program in sources.HOCKEYTECH}
+    assert len(by_league) == len(sources.HOCKEYTECH) == 20
+    assert by_league["echl"] == ("echl", "2c2b89ea7345cae8", "pro")
+    assert {lg for lg, (*_, p) in by_league.items() if p == "pro"} == {"pwhl", "ahl", "echl", "sphl", "chl"}
+    for league in ["bchl", "ajhl", "sjhl", "ojhl", "cchl", "gojhl", "mhl", "nojhl", "vijhl", "kijhl", "mjhl"]:
+        assert by_league[league][0] == league and by_league[league][2] == "junior"
+
+
+def test_ncaa_com_uses_curated_slugs_before_the_name_match():
+    assert sources._ncaa_com_overrides()[("ncaa_mhockey", "132633")][0] == "maryville-mo"  # not cfb 2373 Maryville (TN)
+    schools = "".join(f'<a href="/schools/school-{i}">School {i}</a>' for i in range(600))
+
+    class Html:
+        def get(self, url, **_):
+            r = requests.models.Response()
+            r.status_code = 200
+            if url.startswith("https://www.ncaa.com/schools-index/"):
+                r._content = schools.encode()
+            elif "/hockey/mens-college-hockey/" in url:  # Morrisville listed with no logo; Maryville left out
+                r._content = json.dumps(_teams({"id": 126813, "location": "SUNY Morrisville",
+                                                "displayName": "SUNY Morrisville Mustangs", "logos": []})).encode()
+            else:
+                r._content = json.dumps(_teams()).encode()
+            return r
+
+    rows = sources.ncaa_com(Html())
+    assert sorted((r["league"], r["entity_id"], r["entity_name"], r["url"].rsplit("/", 1)[1], r["program"]) for r in rows) == [
+        ("ncaa_mhockey", "126813", "SUNY Morrisville Mustangs", "morrisville-st.svg", "mens"),
+        ("ncaa_mhockey", "132633", "Maryville (Mo) Saints", "maryville-mo.svg", "mens"),
+    ]
