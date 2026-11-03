@@ -1,3 +1,4 @@
+import collections
 import json
 
 import pytest
@@ -307,6 +308,27 @@ def test_ncaa_com_uses_curated_slugs_before_the_name_match():
         ("ncaa_mhockey", "126813", "SUNY Morrisville Mustangs", "morrisville-st.svg", "mens"),
         ("ncaa_mhockey", "132633", "Maryville (Mo) Saints", "maryville-mo.svg", "mens"),
     ]
+
+
+def test_f1_media_rows_are_keyed_by_jolpica_constructor_id_and_season():
+    rows = sources.f1_media(None)
+    assert {(r["level"], r["league"], r["program"], r["source"]) for r in rows} == {("team", "f1", "pro", "formula1.com")}
+    assert all(r["valid_from"] == r["valid_to"] for r in rows)
+    by = {(r["entity_id"], r["valid_from"], r["variant"]): r["url"] for r in rows}
+    assert len(by) == len(rows)  # one row per constructor, season and variant
+    svg = "https://media.formula1.com/image/upload/common/f1"
+    assert by[("ferrari", 2025, "default")] == f"{svg}/2025/ferrari/2025ferrarilogo"  # no extension: the SVG original
+    assert by[("ferrari", 2025, "dark")] == f"{svg}/2025/ferrari/2025ferrarilogowhite"
+    assert by[("ferrari", 2025, "on_light")] == f"{svg}/2025/ferrari/2025ferrarilogoblack"
+    png = "https://media.formula1.com/content/dam/fom-website/teams"
+    assert by[("red_bull", 2019, "default")] == f"{png}/2019/red-bull-racing-logo.png"
+    assert ("red_bull", 2019, "dark") not in by  # the pre-2024 path has one PNG per team
+    assert ("ferrari", 2024, "dark") in by and ("ferrari", 2024, "on_light") not in by  # 2024 has no logoblack
+    assert not [u for u in by.values() if "/2024/" in u and u.endswith("logoblack")]  # every one answers 404
+    assert by[("sauber", 2024, "default")].endswith("/2024/kicksauber/2024kicksauberlogo")  # slugs follow rebrands
+    assert ("sauber", 2026, "default") not in by and ("audi", 2026, "default") in by
+    seasons = collections.Counter(r["valid_from"] for r in rows if r["variant"] == "default")
+    assert seasons == {y: 11 if y == 2026 else 10 for y in range(2019, 2027)}  # every grid, 2019-2026
 
 
 def test_espn_soccer_records_each_clubs_competitions_from_the_lists_it_already_fetches(monkeypatch):
