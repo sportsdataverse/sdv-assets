@@ -440,3 +440,30 @@ def test_soccer_competitions_merge_keeps_earlier_seasons(tmp_path):
     assert capture.read_csv(path) == [
         old, {**old, "season": "2026", "competition_name": "English Premier League"},
     ]
+
+
+def test_cfl_rows_are_the_leagues_svgs_keyed_by_espn_team_id():
+    rows = sources.cfl(None)
+    teams = [r for r in rows if r["level"] == "team"]
+    assert {r["entity_id"] for r in teams} == {str(i) for i in range(79, 88)}  # ESPN's nine CFL ids, as sdv-py keys them
+    assert all(r["url"].startswith(sources.CFL_LOGOS + "/") and r["url"].endswith(".svg") for r in rows)  # never the rasters
+    assert {r["league"] for r in rows} == {"cfl"} and {r["program"] for r in teams} == {"pro"}
+    by_id = {}
+    for r in teams:
+        by_id.setdefault(r["entity_id"], set()).add((r["variant"], r["url"].rsplit("/", 1)[1]))
+    assert by_id["81"] == {("dark", "edm-dark.svg")}  # Edmonton has no primary SVG
+    assert by_id["87"] == {("default", "ott-primary.svg"), ("dark", "ott-dark.svg")}
+    league = {(r["entity_id"], r["variant"], r["url"].rsplit("/", 1)[1]) for r in rows if r["level"] == "league"}
+    assert league == {("CFL", "default", "cfl-primary.svg"), ("CFL", "french", "lcf-primary.svg")}
+
+
+def test_curated_conference_marks_are_wayback_copies_keyed_by_espn_group_id():
+    rows = sources.curated_conference_marks(None)
+    ids = [r["entity_id"] for r in rows]
+    assert len(ids) == len(set(ids)) >= 39  # one mark per conference
+    assert {(r["level"], r["league"], r["source"]) for r in rows} == {("conference", "cfb", "wayback")}
+    assert all(r["url"].startswith("https://web.archive.org/web/") and "id_/https://" in r["url"] for r in rows)
+    by_id = {r["entity_id"]: r for r in rows}
+    assert by_id["129"]["url"].endswith("://northernsun.org/images/logos/site/site.png")  # NSIC, ESPN group 129
+    assert by_id["187"]["variant"] == "on_dark"  # Conference Carolinas' site mark is white
+    assert {"112", "113"}.isdisjoint(ids)  # ESPN's D-II / D-III independents are no conference

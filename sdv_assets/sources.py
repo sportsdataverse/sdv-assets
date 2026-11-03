@@ -955,7 +955,57 @@ def f1_media(session):
     return out
 
 
+CFL_LOGOS = "https://content.cfl.ca/logos"
+# (ESPN team id, ESPN name, the CFL's own abbreviation, the variants its logo service has an SVG for). ESPN lists the nine
+# teams with no logo, and sdv-py reads the CFL from ESPN, so the rows are keyed by ESPN id. Checked 2026-11-02; a
+# missing variant answers a JSON 404 ("No SVG asset found for this variant").
+CFL_TEAMS = [
+    (79, "BC Lions", "bc", ["primary"]),
+    (80, "Calgary Stampeders", "cgy", ["primary"]),
+    (81, "Edmonton Elks", "edm", ["dark"]),  # its primary is raster-only (see cfl)
+    (82, "Hamilton Tiger-Cats", "ham", ["primary"]),
+    (83, "Montreal Alouettes", "mtl", ["primary"]),
+    (84, "Saskatchewan Roughriders", "ssk", ["primary"]),
+    (85, "Toronto Argonauts", "tor", ["primary"]),
+    (86, "Winnipeg Blue Bombers", "wpg", ["primary", "dark"]),
+    (87, "Ottawa Red Blacks", "ott", ["primary", "dark"]),
+]
+
+
+def cfl(session):
+    """CFL team and league marks from the league's own logo service (``content.cfl.ca/logos/{abbr}-{primary,dark}.svg``,
+    the files cfl.ca's pages draw). Only the SVGs: the service's rasters (``bc-primary.png``, ``edm-dark.png``) are
+    different artwork, not renderings of the SVG, so they are left out. ``cfl-dark.svg`` is the same file as
+    ``cfl-primary.svg``; ``lcf-primary.svg`` is the French (LCF) mark."""
+    out = [
+        row("team", "cfl", tid, name, f"{CFL_LOGOS}/{abbr}-{v}.svg", "cfl", variant="default" if v == "primary" else v,
+            program="pro")
+        for tid, name, abbr, variants in CFL_TEAMS
+        for v in variants
+    ]
+    out += [
+        row("league", "cfl", "CFL", "Canadian Football League", f"{CFL_LOGOS}/cfl-primary.svg", "cfl"),
+        row("league", "cfl", "CFL", "Canadian Football League", f"{CFL_LOGOS}/lcf-primary.svg", "cfl", variant="french"),
+    ]
+    return out
+
+
+def curated_conference_marks(session):
+    """NCAA Division II / III football conference logos, which neither ESPN (its D-II / D-III groups carry no logos) nor
+    NCAA.com serves: each is the conference's own site mark (mostly SIDEARM's ``images/logos/site/site.png``) as the
+    Wayback Machine archived it (``id_``), checked by eye (``curated/conference_marks.csv``). A conference site has no API
+    to re-validate against, so the row is pinned to a snapshot. Keyed by ESPN's college-football group id, the id
+    ``espn_groups`` keys the FBS / FCS conferences by."""
+    with open(CURATED / "conference_marks.csv", newline="") as f:
+        return [
+            row("conference", t["league"], t["entity_id"], t["name"], t["wayback"], "wayback", variant=t["variant"])
+            for t in csv.DictReader(f)
+        ]
+
+
 SOURCES = [
     espn_teams, espn_groups, espn_static, nhl_catalog, nhl_playoff_marks, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback, ncaa_com, wayback_marks,
     f1_media, cebl, easl, lba,
+    cfl,
+    curated_conference_marks,
 ]
