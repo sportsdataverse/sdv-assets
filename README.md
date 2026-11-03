@@ -17,7 +17,7 @@ mark after its source changes.
 | Column | Meaning |
 |---|---|
 | `level` | `team`, `division`, `conference`, `league` |
-| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket`, `aaf`, `nbagl`, `ncaa_baseball`, `ncaa_softball`, `ncaa_mhockey`, `ncaa_whockey`, `phf`, `nbl`, `fiba`, `iihf`, `sphl`, `chl`, `bchl`, `ajhl`, `sjhl`, `ojhl`, `cchl`, `gojhl`, `mhl`, `nojhl`, `vijhl`, `kijhl`, `mjhl`, `f1`, `cebl`, `easl`, `lba` |
+| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket`, `aaf`, `nbagl`, `ncaa_baseball`, `ncaa_softball`, `ncaa_mhockey`, `ncaa_whockey`, `phf`, `nbl`, `fiba`, `iihf`, `sphl`, `chl`, `bchl`, `ajhl`, `sjhl`, `ojhl`, `cchl`, `gojhl`, `mhl`, `nojhl`, `vijhl`, `kijhl`, `mjhl`, `f1`, `cebl`, `easl`, `lba`, `cfl` |
 | `entity_id`, `entity_name` | The source's id and name for the team, group or league |
 | `program` | `pro`, `football`, `mens`, `womens` (Tennessee's Lady Vols mark is a `womens` row), `junior` (OHL/WHL/QMJHL/USHL and the junior A leagues), `national` (a `fiba` / `iihf` national team ESPN lists under one id for both genders, or with no gender), and the MiLB level (`aaa`, `aa`, `high_a`, `single_a`, `short_a`, `rookie`) |
 | `mark_type`, `variant` | `logo` / `wordmark`; `default`, `dark`, the ESPN brand-set variants, `on_light` / `on_dark`, … |
@@ -89,6 +89,9 @@ Official sources only:
 - formula1.com's media CDN: F1 constructor logos for every season's grid since 2019, keyed by the Jolpica `constructor_id`
   through `curated/f1_constructors.csv` (season, constructor, formula1.com slug; slugs change with rebrands). 2024 on:
   the SVG originals (`default`, white `dark`, black `on_light`); 2019-2023: one 96 px PNG per team. Each row covers its season.
+- CFL: the league's own logo service (`content.cfl.ca/logos/{abbr}-{primary,dark}.svg`, the files cfl.ca draws), keyed by
+  ESPN team id (79-87; ESPN lists the teams with no logo). SVGs only: the service's PNGs are different artwork. Plus the
+  CFL league mark and its French (LCF) version.
 
 Non-free Wikipedia files and third-party logo sites (sportslogos.net, Sports Reference) are never captured here.
 Third-party reference captures, kept only as evidence of when a mark changed, live in the private tier
