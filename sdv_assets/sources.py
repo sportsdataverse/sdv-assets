@@ -481,28 +481,45 @@ ESPN_CORE = "https://sports.core.api.espn.com/v2/sports"
 ESPN_SITE = "https://site.web.api.espn.com/apis/site/v2/sports"
 
 
-def _espn_site_teams(session, sport, league):
-    """A competition's current teams from ESPN's site API; [] when ESPN has no team list for it (404)."""
+def _espn_site_league(session, sport, league):
+    """A competition's site-API league object (its teams, name and current season); {} when ESPN has no team list
+    for it (404)."""
     try:
         data = _get_json(session, f"{ESPN_SITE}/{sport}/{league}/teams?limit=1000")
     except requests.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
-            return []
+            return {}
         raise  # a 403 is the droplet being blocked, not an empty league: fail the source, don't publish a gap
-    leagues = (data.get("sports") or [{}])[0].get("leagues") or [{}]
-    return [t["team"] for t in leagues[0].get("teams", [])]
+    return ((data.get("sports") or [{}])[0].get("leagues") or [{}])[0]
+
+
+def _espn_site_teams(session, sport, league):
+    """A competition's current teams from ESPN's site API; [] when ESPN has no team list for it (404)."""
+    return [t["team"] for t in _espn_site_league(session, sport, league).get("teams", [])]
+
+
+# Which ESPN soccer competitions each club is listed in, filled by espn_soccer from the team lists it already fetches
+# (no extra requests); capture merges it into manifest/soccer_competitions.csv. Values are strings so they compare
+# with rows read back from the file.
+SOCCER_COMPETITION_FIELDS = ["competition", "season", "team_id", "competition_name"]
+soccer_competitions: list[dict] = []
 
 
 def espn_soccer(session):
     """Every club in every soccer competition ESPN lists (219 on 2026-09-30). A club appears in its league and in
-    each cup it plays; capture collapses those repeats to one row per club and logo."""
+    each cup it plays; capture collapses those repeats to one row per club and logo, and the memberships are kept
+    in ``soccer_competitions``."""
     comps = [
         ref["$ref"].split("/leagues/")[1].split("?")[0]
         for ref in _get_json(session, f"{ESPN_CORE}/soccer/leagues?limit=1000")["items"]
     ]
-    out = []
+    out, members = [], []
     for comp in comps:
-        for t in _espn_site_teams(session, "soccer", comp):
+        league = _espn_site_league(session, "soccer", comp)
+        season = (league.get("season") or {}).get("year") or league.get("year")
+        for t in (x["team"] for x in league.get("teams", [])):
+            members.append({"competition": comp, "competition_name": league.get("name"),
+                            "season": str(season or ""), "team_id": str(t["id"])})
             for logo in t.get("logos", []):
                 out.append(
                     row("team", "soccer", t["id"], t.get("displayName"), logo["href"], "espn",
@@ -510,6 +527,7 @@ def espn_soccer(session):
                 )
     if not out:
         raise RuntimeError(f"espn_soccer: {len(comps)} competitions listed but no club logos returned")
+    soccer_competitions[:] = members
     return out
 
 
@@ -907,7 +925,37 @@ def lba(session):
     ]
 
 
+F1_MEDIA = "https://media.formula1.com"
+# formula1.com's file names for the 2024+ SVGs -> variant: the white mark is for dark backgrounds, the black one for light
+F1_SVG_VARIANTS = [("logo", "default"), ("logowhite", "dark"), ("logoblack", "on_light")]
+# (season, file name) formula1.com never published: every 2024 team's logoblack answers 404 (checked 2026-11-02)
+F1_SVG_MISSING = {(2024, "logoblack")}
+
+
+def f1_media(session):
+    """F1 constructor logos from formula1.com's media CDN, keyed by the Jolpica ``constructor_id`` sdv-py's F1 family uses.
+    Both paths are season- and slug-keyed, and slugs change with rebrands (Sauber -> ``kicksauber`` -> ``audi``), so the
+    season -> constructor -> slug crosswalk is curated (``curated/f1_constructors.csv``; never matched by name). 2024 on:
+    ``image/upload/common/f1/{year}/{slug}/{year}{slug}{logo,logowhite,logoblack}``, the original SVG (2024 has no
+    ``logoblack``: ``F1_SVG_MISSING``). 2019-2023: ``content/dam/fom-website/teams/{year}/{slug}-logo.png`` (96 px; the
+    2021-23 folders repeat the 2020 files, and each row still carries only its folder's season). Add next season's rows
+    when formula1.com's /en/teams page changes."""
+    out = []
+    with open(CURATED / "f1_constructors.csv", newline="") as f:
+        for t in csv.DictReader(f):
+            y, slug = int(t["season"]), t["f1_slug"]
+            if y >= 2024:
+                urls = [(f"{F1_MEDIA}/image/upload/common/f1/{y}/{slug}/{y}{slug}{name}", v) for name, v in F1_SVG_VARIANTS
+                        if (y, name) not in F1_SVG_MISSING]
+            else:
+                urls = [(f"{F1_MEDIA}/content/dam/fom-website/teams/{y}/{slug}-logo.png", "default")]
+            for url, variant in urls:
+                out.append(row("team", "f1", t["constructor_id"], t["name"], url, "formula1.com", variant=variant,
+                               program="pro", valid_from=y, valid_to=y))
+    return out
+
+
 SOURCES = [
     espn_teams, espn_groups, espn_static, nhl_catalog, nhl_playoff_marks, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback, ncaa_com, wayback_marks,
-    cebl, easl, lba,
+    f1_media, cebl, easl, lba,
 ]

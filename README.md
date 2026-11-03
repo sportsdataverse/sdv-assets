@@ -17,7 +17,7 @@ mark after its source changes.
 | Column | Meaning |
 |---|---|
 | `level` | `team`, `division`, `conference`, `league` |
-| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket`, `aaf`, `nbagl`, `ncaa_baseball`, `ncaa_softball`, `ncaa_mhockey`, `ncaa_whockey`, `phf`, `nbl`, `fiba`, `iihf`, `sphl`, `chl`, `bchl`, `ajhl`, `sjhl`, `ojhl`, `cchl`, `gojhl`, `mhl`, `nojhl`, `vijhl`, `kijhl`, `mjhl`, `cebl`, `easl`, `lba` |
+| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket`, `aaf`, `nbagl`, `ncaa_baseball`, `ncaa_softball`, `ncaa_mhockey`, `ncaa_whockey`, `phf`, `nbl`, `fiba`, `iihf`, `sphl`, `chl`, `bchl`, `ajhl`, `sjhl`, `ojhl`, `cchl`, `gojhl`, `mhl`, `nojhl`, `vijhl`, `kijhl`, `mjhl`, `f1`, `cebl`, `easl`, `lba` |
 | `entity_id`, `entity_name` | The source's id and name for the team, group or league |
 | `program` | `pro`, `football`, `mens`, `womens` (Tennessee's Lady Vols mark is a `womens` row), `junior` (OHL/WHL/QMJHL/USHL and the junior A leagues), `national` (a `fiba` / `iihf` national team ESPN lists under one id for both genders, or with no gender), and the MiLB level (`aaa`, `aa`, `high_a`, `single_a`, `short_a`, `rookie`) |
 | `mark_type`, `variant` | `logo` / `wordmark`; `default`, `dark`, the ESPN brand-set variants, `on_light` / `on_dark`, … |
@@ -30,6 +30,23 @@ mark after its source changes.
 Seasons follow SportsDataverse conventions: the ending year for NHL, NBA, college basketball and LBA (as sdv-py keys it), and the single or
 starting year elsewhere.
 
+## Soccer competitions
+
+Soccer marks sit in one pooled `soccer` league keyed by ESPN club id. [`manifest/soccer_competitions.csv`](manifest/soccer_competitions.csv)
+records which ESPN competitions each club is listed in: one row per competition, season and club. `espn_soccer` reads it
+from the same team lists it captures logos from, so it costs no extra requests. Each run adds its rows and keeps the
+earlier seasons, so the file builds a history the way `marks.csv` does. A run that skips `espn_soccer` leaves it alone.
+
+| Column | Meaning |
+|---|---|
+| `competition` | ESPN's league slug: a domestic league (`eng.1`, `usa.1`), a cup (`eng.fa`, `uefa.champions`) or a national-team tournament (`fifa.world`, `fifa.wwc`) |
+| `season` | ESPN's season year for that competition when the list was read (`season.year` in the site API; the starting year for an August-May league). Blank if ESPN gives none |
+| `team_id` | ESPN club or national-team id, the `entity_id` of the club's `soccer` rows in `marks.csv` |
+| `competition_name` | ESPN's name for the competition (`English Premier League`) |
+
+ESPN lists only each competition's current teams, so a season's rows are the clubs listed while that season was
+current, not a full membership history.
+
 ## Sources
 
 Official sources only:
@@ -39,7 +56,7 @@ Official sources only:
   conference marks with variant `conference_final`, the only official NHL conference marks published.
 - MLB's CDN: team logos and wordmarks, American and National League marks.
 - nflverse's team table: wordmarks and conference/league marks.
-- ESPN soccer: every club in every competition ESPN lists (219 on 2026-09-30).
+- ESPN soccer: every club in every competition ESPN lists (219 on 2026-09-30), with each club's competitions in `manifest/soccer_competitions.csv`.
 - ESPN's NBA G League, college baseball, college softball (filed under baseball) and men's/women's college hockey team lists.
   ESPN keeps one id per school across its college sports, so these share images with `cfb`/`mbb`/`wbb`.
 - ESPN's NBL (Australia) and national teams, pooled into one league per sport: `fiba` (ESPN's FIBA World Cup and men's /
@@ -69,6 +86,9 @@ Official sources only:
 - AAF (2019): aaf.com's archived strip of all eight logos, plus eight crops of it marked `source=aaf-strip-crop`,
   `variant=crop_64px` (owner-approved; no separate official files survive; see `curated/aaf/README.md`).
 - MLB's CDN for minor-league teams: every team the Stats API lists at any level since 2005 (current marks only).
+- formula1.com's media CDN: F1 constructor logos for every season's grid since 2019, keyed by the Jolpica `constructor_id`
+  through `curated/f1_constructors.csv` (season, constructor, formula1.com slug; slugs change with rebrands). 2024 on:
+  the SVG originals (`default`, white `dark`, black `on_light`); 2019-2023: one 96 px PNG per team. Each row covers its season.
 
 Non-free Wikipedia files and third-party logo sites (sportslogos.net, Sports Reference) are never captured here.
 Third-party reference captures, kept only as evidence of when a mark changed, live in the private tier

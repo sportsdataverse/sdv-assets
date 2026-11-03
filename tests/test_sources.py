@@ -1,3 +1,4 @@
+import collections
 import json
 
 import pytest
@@ -378,3 +379,64 @@ def test_lba_keys_by_club_id_in_sdv_ending_years_and_ignores_another_seasons_ans
 
 def test_the_international_basketball_sources_are_registered():
     assert {sources.cebl, sources.easl, sources.lba} <= set(sources.SOURCES)
+
+
+def test_f1_media_rows_are_keyed_by_jolpica_constructor_id_and_season():
+    rows = sources.f1_media(None)
+    assert {(r["level"], r["league"], r["program"], r["source"]) for r in rows} == {("team", "f1", "pro", "formula1.com")}
+    assert all(r["valid_from"] == r["valid_to"] for r in rows)
+    by = {(r["entity_id"], r["valid_from"], r["variant"]): r["url"] for r in rows}
+    assert len(by) == len(rows)  # one row per constructor, season and variant
+    svg = "https://media.formula1.com/image/upload/common/f1"
+    assert by[("ferrari", 2025, "default")] == f"{svg}/2025/ferrari/2025ferrarilogo"  # no extension: the SVG original
+    assert by[("ferrari", 2025, "dark")] == f"{svg}/2025/ferrari/2025ferrarilogowhite"
+    assert by[("ferrari", 2025, "on_light")] == f"{svg}/2025/ferrari/2025ferrarilogoblack"
+    png = "https://media.formula1.com/content/dam/fom-website/teams"
+    assert by[("red_bull", 2019, "default")] == f"{png}/2019/red-bull-racing-logo.png"
+    assert ("red_bull", 2019, "dark") not in by  # the pre-2024 path has one PNG per team
+    assert ("ferrari", 2024, "dark") in by and ("ferrari", 2024, "on_light") not in by  # 2024 has no logoblack
+    assert not [u for u in by.values() if "/2024/" in u and u.endswith("logoblack")]  # every one answers 404
+    assert by[("sauber", 2024, "default")].endswith("/2024/kicksauber/2024kicksauberlogo")  # slugs follow rebrands
+    assert ("sauber", 2026, "default") not in by and ("audi", 2026, "default") in by
+    seasons = collections.Counter(r["valid_from"] for r in rows if r["variant"] == "default")
+    assert seasons == {y: 11 if y == 2026 else 10 for y in range(2019, 2027)}  # every grid, 2019-2026
+
+
+def test_espn_soccer_records_each_clubs_competitions_from_the_lists_it_already_fetches(monkeypatch):
+    monkeypatch.setattr(sources, "soccer_competitions", [])
+    site = f"{sources.ESPN_SITE}/soccer"
+    arsenal = {"id": 359, "displayName": "Arsenal", "logos": [_logo("https://a.espncdn.com/i/teamlogos/soccer/500/359.png")]}
+
+    def league(slug, name, year, *teams):
+        body = _teams(*teams)
+        body["sports"][0]["leagues"][0].update(slug=slug, name=name, season={"year": year, "displayName": str(year)})
+        return (200, body)
+
+    session = FakeSession({
+        f"{sources.ESPN_CORE}/soccer/leagues?": (200, {"items": [
+            {"$ref": f"http://core/soccer/leagues/{s}?lang=en"} for s in ["eng.1", "uefa.champions", "none"]
+        ]}),
+        f"{site}/eng.1/": league("eng.1", "English Premier League", 2026, arsenal, {"id": 360, "logos": []}),
+        f"{site}/uefa.champions/": league("uefa.champions", "UEFA Champions League", 2026, arsenal),
+        f"{site}/none/": (404, {}),
+    })
+    rows = sources.espn_soccer(session)
+    assert len(rows) == 2  # Arsenal's logo once per list; capture collapses the repeat
+    assert {(m["competition"], m["season"], m["team_id"]) for m in sources.soccer_competitions} == {
+        ("eng.1", "2026", "359"), ("eng.1", "2026", "360"), ("uefa.champions", "2026", "359"),
+    }  # a club with no logo is still a member, and a competition with no team list adds nothing
+    assert {m["competition_name"] for m in sources.soccer_competitions} == {"English Premier League", "UEFA Champions League"}
+    sources.espn_soccer(session)  # a second run replaces the list rather than doubling it
+    assert len(sources.soccer_competitions) == 3
+
+
+def test_soccer_competitions_merge_keeps_earlier_seasons(tmp_path):
+    from sdv_assets import capture
+
+    path = tmp_path / "soccer_competitions.csv"
+    old = {"competition": "eng.1", "competition_name": "Premier League", "season": "2025", "team_id": "359"}
+    capture.merge_soccer_competitions(path, [old, {**old, "season": "2026"}])
+    capture.merge_soccer_competitions(path, [{**old, "season": "2026", "competition_name": "English Premier League"}])
+    assert capture.read_csv(path) == [
+        old, {**old, "season": "2026", "competition_name": "English Premier League"},
+    ]
