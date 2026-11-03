@@ -98,7 +98,9 @@ Official sources only:
   CFL league mark and its French (LCF) version.
 - NCAA Division II / III football conference logos (ESPN and NCAA.com serve none), each the conference's own site mark
   pinned to a Wayback Machine `id_` copy and keyed by ESPN's college-football group id (`curated/conference_marks.csv`;
-  source `wayback`, league `cfb`, as `espn_groups` keys the FBS / FCS conferences).
+  source `wayback`, league `cfb`, as `espn_groups` keys the FBS / FCS conferences). The same file holds the hockey-only
+  college conferences (leagues `ncaa_mhockey` / `ncaa_whockey`), keyed by the sdv-reference-data group id
+  (`ncaa_mhockey:hockey-east`).
 
 Non-free Wikipedia files and third-party logo sites (sportslogos.net, Sports Reference) are never captured here.
 Third-party reference captures, kept only as evidence of when a mark changed, live in the private tier

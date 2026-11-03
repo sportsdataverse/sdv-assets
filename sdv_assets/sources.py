@@ -1023,7 +1023,9 @@ def curated_conference_marks(session):
     NCAA.com serves: each is the conference's own site mark (mostly SIDEARM's ``images/logos/site/site.png``) as the
     Wayback Machine archived it (``id_``), checked by eye (``curated/conference_marks.csv``). A conference site has no API
     to re-validate against, so the row is pinned to a snapshot. Keyed by ESPN's college-football group id, the id
-    ``espn_groups`` keys the FBS / FCS conferences by."""
+    ``espn_groups`` keys the FBS / FCS conferences by. Also the hockey-only college conferences (``ncaa_mhockey`` /
+    ``ncaa_whockey``; ESPN's hockey groups carry no logos and its women's list has none), keyed by the
+    sdv-reference-data group id (``ncaa_mhockey:hockey-east``), the ``conference_id`` sdvplot's team rows carry."""
     with open(CURATED / "conference_marks.csv", newline="") as f:
         return [
             row("conference", t["league"], t["entity_id"], t["name"], t["wayback"], "wayback", variant=t["variant"])
