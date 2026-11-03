@@ -17,17 +17,17 @@ mark after its source changes.
 | Column | Meaning |
 |---|---|
 | `level` | `team`, `division`, `conference`, `league` |
-| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket`, `aaf`, `nbagl`, `ncaa_baseball`, `ncaa_softball`, `ncaa_mhockey`, `ncaa_whockey`, `phf`, `nbl`, `fiba`, `iihf`, `sphl`, `chl`, `bchl`, `ajhl`, `sjhl`, `ojhl`, `cchl`, `gojhl`, `mhl`, `nojhl`, `vijhl`, `kijhl`, `mjhl`, `f1` |
+| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket`, `aaf`, `nbagl`, `ncaa_baseball`, `ncaa_softball`, `ncaa_mhockey`, `ncaa_whockey`, `phf`, `nbl`, `fiba`, `iihf`, `sphl`, `chl`, `bchl`, `ajhl`, `sjhl`, `ojhl`, `cchl`, `gojhl`, `mhl`, `nojhl`, `vijhl`, `kijhl`, `mjhl`, `f1`, `cebl`, `easl`, `lba` |
 | `entity_id`, `entity_name` | The source's id and name for the team, group or league |
 | `program` | `pro`, `football`, `mens`, `womens` (Tennessee's Lady Vols mark is a `womens` row), `junior` (OHL/WHL/QMJHL/USHL and the junior A leagues), `national` (a `fiba` / `iihf` national team ESPN lists under one id for both genders, or with no gender), and the MiLB level (`aaa`, `aa`, `high_a`, `single_a`, `short_a`, `rookie`) |
 | `mark_type`, `variant` | `logo` / `wordmark`; `default`, `dark`, the ESPN brand-set variants, `on_light` / `on_dark`, … |
-| `valid_from`, `valid_to` | Seasons the source says the mark was used, where it says so (the NHL catalog, HockeyTech, the NHL playoff bracket and ESPN's XFL/UFL season lists do); blank otherwise. One row per image, so a file used again after a gap spans the gap |
+| `valid_from`, `valid_to` | Seasons the source says the mark was used, where it says so (the NHL catalog, HockeyTech, the NHL playoff bracket, ESPN's XFL/UFL season lists and Lega Basket do); blank otherwise. One row per image, so a file used again after a gap spans the gap |
 | `source`, `url` | Where it was captured from |
 | `sha256`, `ext`, `bytes`, `width`, `height` | The image (SVGs have no pixel size) |
 | `archive_url` | Where the archived copy is served |
 | `first_seen`, `last_seen` | Capture dates. When a URL starts serving new bytes, a new row appears and the old row keeps its `last_seen` |
 
-Seasons follow SportsDataverse conventions: the ending year for NHL, NBA and college basketball, and the single or
+Seasons follow SportsDataverse conventions: the ending year for NHL, NBA, college basketball and LBA (as sdv-py keys it), and the single or
 starting year elsewhere.
 
 ## Soccer competitions
@@ -67,6 +67,13 @@ Official sources only:
 - Fox: USFL (2022-23) team logos. Fox owned the league.
 - HockeyTech, the stats platform the leagues' own sites use: PWHL, AHL, ECHL, SPHL, CHL, OHL, WHL, QMJHL, USHL and the
   junior A leagues (BCHL, AJHL, SJHL, OJHL, CCHL, GOJHL, MHL, NOJHL, VIJHL, KIJHL, MJHL) logos for every regular season.
+- International basketball, from the team lists sdv-py's families read and keyed by the same ids:
+  - CEBL: the league's own stats API (`api.data.cebl.ca/teams/`), every franchise past and present by CEBL team id,
+    with its logo and its icon (variant `icon`).
+  - EASL: Sportradar DataCore's team images, keyed by the DataCore team UUID, for the current season's teams. The
+    list comes from the unofficial keyless DataCore mirror sdv-py's `easl` family reads; the images are DataCore's.
+  - LBA (Lega Basket Serie A): legabasket.it's own API and media bucket, every season from 2020-21 on, keyed by the
+    stable `club_id` (LBA's `team_id` changes every season; join it to the club through sdv-py's `lba_teams`).
 - Cricket: ESPN's CDN by ESPNcricinfo team id, plus ESPNcricinfo's own image of each team's mark (variant `cricinfo`),
   for the teams in `curated/cricinfo_teams.csv` (national sides and T20 franchises; ESPN's and Cricinfo's APIs refuse
   the droplet, so the list is curated from Cricinfo pages archived by the Wayback Machine).

@@ -2,7 +2,7 @@
 
 A row names a mark (level, league, entity, program, mark type, variant, validity window) and the URL
 to fetch it from. Capture decides which rows are real by fetching and checking the image.
-Seasons follow SDV conventions: ending year for NHL / NBA / MBB / WBB, single or starting year elsewhere.
+Seasons follow SDV conventions: ending year for NHL / NBA / MBB / WBB / LBA, single or starting year elsewhere.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ import datetime as dt
 import io
 import os
 import re
+import time
 from pathlib import Path
 
 import requests
@@ -849,6 +850,81 @@ def wayback_marks(session):
     return out
 
 
+# CEBL's own stats API (the CEBL Stats Hub's backend). Its key is public, hard-coded in the hub's page bundle; this is
+# sdv-py's FALLBACK_KEY (sportsdataverse/basketball/cebl/cebl_runtime.py). Override with SDV_ASSETS_CEBL_KEY.
+CEBL_API = "https://api.data.cebl.ca"
+CEBL_HUB = "https://cebl-stats-hub.web.app"
+CEBL_KEY = os.environ.get("SDV_ASSETS_CEBL_KEY", "800chyzv2hvur3z0ogh39cve2zok0c")
+
+
+def cebl(session):
+    """CEBL team marks from the league's own API, keyed by CEBL's team id (sdv-py ``cebl_teams`` ``team_id``). Every
+    franchise it lists, past ones included (a relocated franchise has two ids), with its logo and its icon (variant
+    ``icon``). A defunct team whose icon is a current team's file (Fraser Valley shows Vancouver's) keeps only its logo."""
+    r = session.get(f"{CEBL_API}/teams/", timeout=60,
+                    headers={**UA, "X-Api-Key": CEBL_KEY, "Origin": CEBL_HUB, "Referer": CEBL_HUB + "/"})
+    r.raise_for_status()
+    teams = r.json()
+    active_icons = {t.get("icon_url") for t in teams if t.get("is_active")}
+    out = []
+    for t in teams:
+        if t.get("logo_url"):
+            out.append(row("team", "cebl", t["id"], t.get("name_en"), t["logo_url"], "cebl", program="pro"))
+        if t.get("icon_url") and (t.get("is_active") or t["icon_url"] not in active_icons):
+            out.append(row("team", "cebl", t["id"], t.get("name_en"), t["icon_url"], "cebl", variant="icon", program="pro"))
+    if not out:
+        raise RuntimeError("cebl: the team list carried no logos")
+    return out
+
+
+# EASL has no open first-party feed. sdv-py reads an unofficial keyless mirror of Sportradar DataCore (organisation
+# b1e0z); the logo URLs it carries point at DataCore's own image CDN.
+EASL_API = "https://easl.joshricha.com/api/v1"
+
+
+def easl(session):
+    """EASL team logos (DataCore's image of each team), keyed by the DataCore team UUID (sdv-py ``easl_teams``
+    ``team_id``). The list holds the current season's teams only."""
+    out = [
+        row("team", "easl", t["teamId"], t.get("nameFullLocal"), t["logo"], "datacore", program="pro")
+        for t in _get_json(session, f"{EASL_API}/teams", use_proxy=False)
+        if t.get("logo")
+    ]
+    if not out:
+        raise RuntimeError("easl: the team list carried no logos")
+    return out
+
+
+LBA_API = "https://www.legabasket.it/api/teams/get-teams"
+LBA_FIRST = 2020  # starting year of the first season (2020-21) whose teams carry a logo_key
+LBA_DELAY = 2.0  # legabasket.it's robots.txt sets Crawl-delay: 2
+
+
+def lba(session):
+    """Lega Basket Serie A logos from the site's own API, every season from 2020-21 on, keyed by the club id (sdv-py
+    ``lba_teams`` ``club_id``; its ``team_id`` is re-issued every season, so game rows reach the club through
+    ``lba_teams``). The API sends a season's starting year; ``valid_from`` / ``valid_to`` are SDV ending years, and a
+    file used in several seasons is one row spanning them."""
+    span = {}
+    for year in range(LBA_FIRST, dt.date.today().year + 1):
+        if year > LBA_FIRST:
+            time.sleep(LBA_DELAY)
+        data = _get_json(session, f"{LBA_API}?items=50&year={year}", use_proxy=False)
+        cdn = data.get("cdn_url") or "https://lba-media.s3.eu-south-1.amazonaws.com"
+        for t in data.get("teams") or []:
+            # a year the site has no teams for yet may answer with its default season instead
+            if t.get("logo_key") and t.get("club_id") and t.get("year") == year:
+                k = (str(t["club_id"]), f"{cdn}/{t['logo_key']}")
+                lo, _, _ = span.get(k, (year + 1, None, None))
+                span[k] = (lo, year + 1, t.get("name"))  # the latest season's name
+    if not span:
+        raise RuntimeError("lba: no season carried a team logo")
+    return [
+        row("team", "lba", cid, name, url, "legabasket", program="pro", valid_from=lo, valid_to=hi)
+        for (cid, url), (lo, hi, name) in span.items()
+    ]
+
+
 F1_MEDIA = "https://media.formula1.com"
 # formula1.com's file names for the 2024+ SVGs -> variant: the white mark is for dark backgrounds, the black one for light
 F1_SVG_VARIANTS = [("logo", "default"), ("logowhite", "dark"), ("logoblack", "on_light")]
@@ -881,5 +957,5 @@ def f1_media(session):
 
 SOURCES = [
     espn_teams, espn_groups, espn_static, nhl_catalog, nhl_playoff_marks, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback, ncaa_com, wayback_marks,
-    f1_media,
+    f1_media, cebl, easl, lba,
 ]
