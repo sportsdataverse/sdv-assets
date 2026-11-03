@@ -480,28 +480,45 @@ ESPN_CORE = "https://sports.core.api.espn.com/v2/sports"
 ESPN_SITE = "https://site.web.api.espn.com/apis/site/v2/sports"
 
 
-def _espn_site_teams(session, sport, league):
-    """A competition's current teams from ESPN's site API; [] when ESPN has no team list for it (404)."""
+def _espn_site_league(session, sport, league):
+    """A competition's site-API league object (its teams, name and current season); {} when ESPN has no team list
+    for it (404)."""
     try:
         data = _get_json(session, f"{ESPN_SITE}/{sport}/{league}/teams?limit=1000")
     except requests.HTTPError as e:
         if e.response is not None and e.response.status_code == 404:
-            return []
+            return {}
         raise  # a 403 is the droplet being blocked, not an empty league: fail the source, don't publish a gap
-    leagues = (data.get("sports") or [{}])[0].get("leagues") or [{}]
-    return [t["team"] for t in leagues[0].get("teams", [])]
+    return ((data.get("sports") or [{}])[0].get("leagues") or [{}])[0]
+
+
+def _espn_site_teams(session, sport, league):
+    """A competition's current teams from ESPN's site API; [] when ESPN has no team list for it (404)."""
+    return [t["team"] for t in _espn_site_league(session, sport, league).get("teams", [])]
+
+
+# Which ESPN soccer competitions each club is listed in, filled by espn_soccer from the team lists it already fetches
+# (no extra requests); capture merges it into manifest/soccer_competitions.csv. Values are strings so they compare
+# with rows read back from the file.
+SOCCER_COMPETITION_FIELDS = ["competition", "season", "team_id", "competition_name"]
+soccer_competitions: list[dict] = []
 
 
 def espn_soccer(session):
     """Every club in every soccer competition ESPN lists (219 on 2026-09-30). A club appears in its league and in
-    each cup it plays; capture collapses those repeats to one row per club and logo."""
+    each cup it plays; capture collapses those repeats to one row per club and logo, and the memberships are kept
+    in ``soccer_competitions``."""
     comps = [
         ref["$ref"].split("/leagues/")[1].split("?")[0]
         for ref in _get_json(session, f"{ESPN_CORE}/soccer/leagues?limit=1000")["items"]
     ]
-    out = []
+    out, members = [], []
     for comp in comps:
-        for t in _espn_site_teams(session, "soccer", comp):
+        league = _espn_site_league(session, "soccer", comp)
+        season = (league.get("season") or {}).get("year") or league.get("year")
+        for t in (x["team"] for x in league.get("teams", [])):
+            members.append({"competition": comp, "competition_name": league.get("name"),
+                            "season": str(season or ""), "team_id": str(t["id"])})
             for logo in t.get("logos", []):
                 out.append(
                     row("team", "soccer", t["id"], t.get("displayName"), logo["href"], "espn",
@@ -509,6 +526,7 @@ def espn_soccer(session):
                 )
     if not out:
         raise RuntimeError(f"espn_soccer: {len(comps)} competitions listed but no club logos returned")
+    soccer_competitions[:] = members
     return out
 
 

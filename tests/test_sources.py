@@ -307,3 +307,43 @@ def test_ncaa_com_uses_curated_slugs_before_the_name_match():
         ("ncaa_mhockey", "126813", "SUNY Morrisville Mustangs", "morrisville-st.svg", "mens"),
         ("ncaa_mhockey", "132633", "Maryville (Mo) Saints", "maryville-mo.svg", "mens"),
     ]
+
+
+def test_espn_soccer_records_each_clubs_competitions_from_the_lists_it_already_fetches(monkeypatch):
+    monkeypatch.setattr(sources, "soccer_competitions", [])
+    site = f"{sources.ESPN_SITE}/soccer"
+    arsenal = {"id": 359, "displayName": "Arsenal", "logos": [_logo("https://a.espncdn.com/i/teamlogos/soccer/500/359.png")]}
+
+    def league(slug, name, year, *teams):
+        body = _teams(*teams)
+        body["sports"][0]["leagues"][0].update(slug=slug, name=name, season={"year": year, "displayName": str(year)})
+        return (200, body)
+
+    session = FakeSession({
+        f"{sources.ESPN_CORE}/soccer/leagues?": (200, {"items": [
+            {"$ref": f"http://core/soccer/leagues/{s}?lang=en"} for s in ["eng.1", "uefa.champions", "none"]
+        ]}),
+        f"{site}/eng.1/": league("eng.1", "English Premier League", 2026, arsenal, {"id": 360, "logos": []}),
+        f"{site}/uefa.champions/": league("uefa.champions", "UEFA Champions League", 2026, arsenal),
+        f"{site}/none/": (404, {}),
+    })
+    rows = sources.espn_soccer(session)
+    assert len(rows) == 2  # Arsenal's logo once per list; capture collapses the repeat
+    assert {(m["competition"], m["season"], m["team_id"]) for m in sources.soccer_competitions} == {
+        ("eng.1", "2026", "359"), ("eng.1", "2026", "360"), ("uefa.champions", "2026", "359"),
+    }  # a club with no logo is still a member, and a competition with no team list adds nothing
+    assert {m["competition_name"] for m in sources.soccer_competitions} == {"English Premier League", "UEFA Champions League"}
+    sources.espn_soccer(session)  # a second run replaces the list rather than doubling it
+    assert len(sources.soccer_competitions) == 3
+
+
+def test_soccer_competitions_merge_keeps_earlier_seasons(tmp_path):
+    from sdv_assets import capture
+
+    path = tmp_path / "soccer_competitions.csv"
+    old = {"competition": "eng.1", "competition_name": "Premier League", "season": "2025", "team_id": "359"}
+    capture.merge_soccer_competitions(path, [old, {**old, "season": "2026"}])
+    capture.merge_soccer_competitions(path, [{**old, "season": "2026", "competition_name": "English Premier League"}])
+    assert capture.read_csv(path) == [
+        old, {**old, "season": "2026", "competition_name": "English Premier League"},
+    ]
