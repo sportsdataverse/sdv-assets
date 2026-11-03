@@ -30,6 +30,23 @@ mark after its source changes.
 Seasons follow SportsDataverse conventions: the ending year for NHL, NBA and college basketball, and the single or
 starting year elsewhere.
 
+## Soccer competitions
+
+Soccer marks sit in one pooled `soccer` league keyed by ESPN club id. [`manifest/soccer_competitions.csv`](manifest/soccer_competitions.csv)
+records which ESPN competitions each club is listed in: one row per competition, season and club. `espn_soccer` reads it
+from the same team lists it captures logos from, so it costs no extra requests. Each run adds its rows and keeps the
+earlier seasons, so the file builds a history the way `marks.csv` does. A run that skips `espn_soccer` leaves it alone.
+
+| Column | Meaning |
+|---|---|
+| `competition` | ESPN's league slug: a domestic league (`eng.1`, `usa.1`), a cup (`eng.fa`, `uefa.champions`) or a national-team tournament (`fifa.world`, `fifa.wwc`) |
+| `season` | ESPN's season year for that competition when the list was read (`season.year` in the site API; the starting year for an August-May league). Blank if ESPN gives none |
+| `team_id` | ESPN club or national-team id, the `entity_id` of the club's `soccer` rows in `marks.csv` |
+| `competition_name` | ESPN's name for the competition (`English Premier League`) |
+
+ESPN lists only each competition's current teams, so a season's rows are the clubs listed while that season was
+current, not a full membership history.
+
 ## Sources
 
 Official sources only:
@@ -39,7 +56,7 @@ Official sources only:
   conference marks with variant `conference_final`, the only official NHL conference marks published.
 - MLB's CDN: team logos and wordmarks, American and National League marks.
 - nflverse's team table: wordmarks and conference/league marks.
-- ESPN soccer: every club in every competition ESPN lists (219 on 2026-09-30).
+- ESPN soccer: every club in every competition ESPN lists (219 on 2026-09-30), with each club's competitions in `manifest/soccer_competitions.csv`.
 - ESPN's NBA G League, college baseball, college softball (filed under baseball) and men's/women's college hockey team lists.
   ESPN keeps one id per school across its college sports, so these share images with `cfb`/`mbb`/`wbb`.
 - ESPN's NBL (Australia) and national teams, pooled into one league per sport: `fiba` (ESPN's FIBA World Cup and men's /

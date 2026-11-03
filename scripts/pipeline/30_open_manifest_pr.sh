@@ -3,7 +3,7 @@
 # Idempotent: no change means no branch; an existing branch or PR for the date is left alone.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-if git diff --quiet -- manifest/; then
+if [ -z "$(git status --porcelain -- manifest/)" ]; then  # porcelain also sees a new manifest file
   echo "manifest unchanged; no PR"
   exit 0
 fi
@@ -14,7 +14,7 @@ if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
 fi
 added=$(git diff --numstat -- manifest/marks.csv | awk '{print $1}')
 git checkout -q -b "$branch"
-git add manifest/marks.csv manifest/failures.csv
+git add manifest/*.csv
 git commit -q -m "data: monthly capture $(date -u +%F)"
 git push -q -u origin "$branch"
 gh pr create --base main --head "$branch" --title "data: monthly capture $(date -u +%F)" \
