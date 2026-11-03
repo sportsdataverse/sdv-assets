@@ -61,6 +61,10 @@ team,cricket,1428675,Antigua And Barbuda Falcons,mens,logo,default,,,espn,https:
 team,cricket,2234,Ireland Women,womens,logo,default,,,espn,https://a.espncdn.com/i/teamlogos/cricket/500/2234.png,"HTTP 404, not an image (1 B)",2026-11-02
 team,cricket,2410,Netherlands Women,womens,logo,default,,,espn,https://a.espncdn.com/i/teamlogos/cricket/500/2410.png,"HTTP 404, not an image (1 B)",2026-11-02
 team,cricket,271866,Zimbabwe Women,womens,logo,default,,,espn,https://a.espncdn.com/i/teamlogos/cricket/500/271866.png,"HTTP 404, not an image (1 B)",2026-11-02
+team,f1,hrt,HRT,pro,logo,default,2011,2011,wikimedia-commons,https://upload.wikimedia.org/wikipedia/commons/c/c5/HRT_new_logo.jpg,HTTP 429,2026-11-02
+team,f1,hrt,HRT,pro,logo,default,2012,2012,wikimedia-commons,https://upload.wikimedia.org/wikipedia/commons/8/8d/HRT_F1_TEAM_2012.svg,HTTP 429,2026-11-02
+team,f1,mclaren,McLaren,pro,logo,default,2007,2013,wikimedia-commons,https://upload.wikimedia.org/wikipedia/commons/7/7a/Vodafone_mclaren_f1_logo.jpg,HTTP 429,2026-11-02
+team,f1,red_bull,Red Bull,pro,logo,default,2005,2012,wikimedia-commons,https://upload.wikimedia.org/wikipedia/commons/6/68/Red_Bull_Racing_logo_ita.png,HTTP 429,2026-11-02
 team,gojhl,54,GHC Prospects,junior,logo,default,2014,2014,hockeytech,https://lscluster.hockeytech.com/download.php?file_path=img/logos/54.jpg&liaf=1&client_code=gojhl,"HTTP 200, not an image (43 B)",2026-11-02
 team,kijhl,22,Penticton Lakers,junior,logo,default,2010,2013,hockeytech,https://lscluster.hockeytech.com/download.php?file_path=img/logos/22.jpg&liaf=1&client_code=kijhl,"HTTP 200, not an image (43 B)",2026-11-02
 team,milb,1210,Petroleros de Minatitlan,aaa,logo,cap_on_light,,,mlbstatic,https://www.mlbstatic.com/team-logos/team-cap-on-light/1210.svg,"HTTP 404, not an image (14 B)",2026-11-02
