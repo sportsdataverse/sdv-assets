@@ -955,6 +955,23 @@ def f1_media(session):
     return out
 
 
+def f1_history(session):
+    """F1 constructor logos for the seasons before ``f1_media`` (2019), keyed by the same Jolpica ``constructor_id``
+    (``curated/f1_history.csv``, one row per file, each checked by eye). 2015-2018, source ``formula1.com``: the logo the
+    site's team pages drew that season (``content/fom-website/en/championship/teams/{Team}/_jcr_content/logo.img.*``,
+    gone from the live site), as a Wayback Machine ``id_`` copy captured in that season, one row per season. formula1.com's
+    2003-2014 site showed no team logos. 2002-2015, source ``wikimedia-commons``: Commons files tagged public domain
+    (PD-textlogo / PD-ineligible), each row naming its file page and license and covering the seasons the file's
+    description or the team's entry name dates it to. capture keys a manifest row by URL, so a file used for several
+    seasons is one row with a season range."""
+    with open(CURATED / "f1_history.csv", newline="") as f:
+        return [
+            row("team", "f1", t["constructor_id"], t["name"], t["url"], t["source"], program="pro",
+                valid_from=int(t["valid_from"]), valid_to=int(t["valid_to"]))
+            for t in csv.DictReader(f)
+        ]
+
+
 CFL_LOGOS = "https://content.cfl.ca/logos"
 # (ESPN team id, ESPN name, the CFL's own abbreviation, the variants its logo service has an SVG for). ESPN lists the nine
 # teams with no logo, and sdv-py reads the CFL from ESPN, so the rows are keyed by ESPN id. Checked 2026-11-02; a
@@ -1005,7 +1022,7 @@ def curated_conference_marks(session):
 
 SOURCES = [
     espn_teams, espn_groups, espn_static, nhl_catalog, nhl_playoff_marks, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback, ncaa_com, wayback_marks,
-    f1_media, cebl, easl, lba,
+    f1_media, f1_history, cebl, easl, lba,
     cfl,
     curated_conference_marks,
 ]
