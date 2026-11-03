@@ -1,4 +1,5 @@
 import collections
+import csv
 import json
 
 import pytest
@@ -402,6 +403,30 @@ def test_f1_media_rows_are_keyed_by_jolpica_constructor_id_and_season():
     assert seasons == {y: 11 if y == 2026 else 10 for y in range(2019, 2027)}  # every grid, 2019-2026
 
 
+def test_f1_history_rows_cover_the_seasons_before_f1_media():
+    rows = sources.f1_history(None)
+    assert sources.f1_history in sources.SOURCES
+    assert {(r["level"], r["league"], r["program"], r["variant"]) for r in rows} == {("team", "f1", "pro", "default")}
+    assert len({r["url"] for r in rows}) == len(rows)  # capture keys a manifest row by URL: no file twice
+    assert all(r["valid_from"] <= r["valid_to"] < 2019 for r in rows)  # f1_media owns 2019 on
+    fom = [r for r in rows if r["source"] == "formula1.com"]
+    assert all(r["valid_from"] == r["valid_to"] and "/web/" + str(r["valid_from"]) in r["url"] or r["entity_id"] == "mercedes"
+               for r in fom)  # one season each, captured in it (2017 Mercedes' only capture is from 2018)
+    assert all(r["url"].startswith("https://web.archive.org/web/") and "id_/https://www.formula1.com/content/" in r["url"]
+               for r in fom)
+    grids = collections.Counter(r["valid_from"] for r in fom)
+    assert grids == {2015: 9, 2016: 11, 2017: 10, 2018: 10}  # 2015's page had no Manor
+    commons = [r for r in rows if r["source"] == "wikimedia-commons"]
+    assert commons and all(r["url"].startswith("https://upload.wikimedia.org/wikipedia/commons/") for r in commons)
+    with open(sources.CURATED / "f1_history.csv", newline="") as f:
+        lic = {t["url"]: (t["license"], t["file_page"]) for t in csv.DictReader(f) if t["source"] == "wikimedia-commons"}
+    assert {v[0] for v in lic.values()} <= {"PD-textlogo", "PD-ineligible"}  # public domain only, per file
+    assert all(v[1].startswith("https://commons.wikimedia.org/wiki/File:") for v in lic.values())
+    by = {(r["entity_id"], r["valid_from"]): r for r in rows}
+    assert (by[("bmw_sauber", 2006)]["valid_to"], by[("brawn", 2009)]["valid_to"]) == (2009, 2009)
+    assert by[("manor", 2015)]["source"] == "wikimedia-commons" and by[("manor", 2016)]["source"] == "formula1.com"
+
+
 def test_espn_soccer_records_each_clubs_competitions_from_the_lists_it_already_fetches(monkeypatch):
     monkeypatch.setattr(sources, "soccer_competitions", [])
     site = f"{sources.ESPN_SITE}/soccer"
@@ -474,3 +499,20 @@ def test_curated_conference_marks_are_wayback_copies_keyed_by_espn_group_id():
     hockey = [(league, i) for league, i in keys if league != "cfb"]
     assert len(hockey) == 12 and all(i.startswith(f"{league}:") for league, i in hockey)
     assert {("ncaa_whockey", "ncaa_whockey:newha"), ("ncaa_mhockey", "ncaa_mhockey:cha")} <= set(hockey)
+
+
+def test_an_unreachable_proxy_falls_back_to_direct_for_the_run(monkeypatch):
+    monkeypatch.setenv("SDV_ASSETS_API_PROXY", "http://user:pass@proxy.invalid:7000")
+    monkeypatch.setattr(sources, "_PROXY_DOWN", [])
+    calls = []
+
+    class Session:
+        def get(self, url, proxies=None, **_):
+            calls.append(proxies)
+            if proxies:
+                raise sources.requests.exceptions.ProxyError("Unable to connect to proxy")
+            return _response(200, {"ok": True})
+
+    assert sources._get_json(Session(), "https://site.api.espn.com/a") == {"ok": True}
+    assert sources._get_json(Session(), "https://site.api.espn.com/b") == {"ok": True}
+    assert [bool(p) for p in calls] == [True, False, False]  # one failed proxied call, then direct

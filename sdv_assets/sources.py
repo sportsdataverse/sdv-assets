@@ -91,10 +91,21 @@ def _get_json(session, url, use_proxy=True):
     """JSON API calls. ESPN's site API blocks datacenter IPs after heavy traffic, so these few calls can go
     through a proxy (SDV_ASSETS_API_PROXY, a full proxy URL); image downloads never do. The MLB Stats API
     refuses that proxy (403), so its calls pass ``use_proxy=False``."""
-    proxy = os.environ.get("SDV_ASSETS_API_PROXY") if use_proxy else None
-    r = session.get(url, headers=UA, timeout=60, proxies={"http": proxy, "https": proxy} if proxy else None)
+    proxy = os.environ.get("SDV_ASSETS_API_PROXY") if use_proxy and not _PROXY_DOWN else None
+    try:
+        r = session.get(url, headers=UA, timeout=60, proxies={"http": proxy, "https": proxy} if proxy else None)
+    except requests.exceptions.ProxyError as e:
+        if not proxy:
+            raise
+        # an unreachable proxy (its account lapsed, 2026-11-01) must not cost the whole capture: go direct for the run
+        print(f"proxy unreachable ({type(e).__name__}); API calls go direct for the rest of this run")
+        _PROXY_DOWN.append(True)
+        r = session.get(url, headers=UA, timeout=60)
     r.raise_for_status()
     return r.json()
+
+
+_PROXY_DOWN: list[bool] = []  # set once a proxied call fails to connect
 
 
 def _variant(rel):
@@ -955,6 +966,23 @@ def f1_media(session):
     return out
 
 
+def f1_history(session):
+    """F1 constructor logos for the seasons before ``f1_media`` (2019), keyed by the same Jolpica ``constructor_id``
+    (``curated/f1_history.csv``, one row per file, each checked by eye). 2015-2018, source ``formula1.com``: the logo the
+    site's team pages drew that season (``content/fom-website/en/championship/teams/{Team}/_jcr_content/logo.img.*``,
+    gone from the live site), as a Wayback Machine ``id_`` copy captured in that season, one row per season. formula1.com's
+    2003-2014 site showed no team logos. 2002-2015, source ``wikimedia-commons``: Commons files tagged public domain
+    (PD-textlogo / PD-ineligible), each row naming its file page and license and covering the seasons the file's
+    description or the team's entry name dates it to. capture keys a manifest row by URL, so a file used for several
+    seasons is one row with a season range."""
+    with open(CURATED / "f1_history.csv", newline="") as f:
+        return [
+            row("team", "f1", t["constructor_id"], t["name"], t["url"], t["source"], program="pro",
+                valid_from=int(t["valid_from"]), valid_to=int(t["valid_to"]))
+            for t in csv.DictReader(f)
+        ]
+
+
 CFL_LOGOS = "https://content.cfl.ca/logos"
 # (ESPN team id, ESPN name, the CFL's own abbreviation, the variants its logo service has an SVG for). ESPN lists the nine
 # teams with no logo, and sdv-py reads the CFL from ESPN, so the rows are keyed by ESPN id. Checked 2026-11-02; a
@@ -1007,7 +1035,7 @@ def curated_conference_marks(session):
 
 SOURCES = [
     espn_teams, espn_groups, espn_static, nhl_catalog, nhl_playoff_marks, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback, ncaa_com, wayback_marks,
-    f1_media, cebl, easl, lba,
+    f1_media, f1_history, cebl, easl, lba,
     cfl,
     curated_conference_marks,
 ]

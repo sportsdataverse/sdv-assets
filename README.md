@@ -89,6 +89,10 @@ Official sources only:
 - formula1.com's media CDN: F1 constructor logos for every season's grid since 2019, keyed by the Jolpica `constructor_id`
   through `curated/f1_constructors.csv` (season, constructor, formula1.com slug; slugs change with rebrands). 2024 on:
   the SVG originals (`default`, white `dark`, black `on_light`); 2019-2023: one 96 px PNG per team. Each row covers its season.
+- F1 constructor logos before 2019 (`curated/f1_history.csv`, same Jolpica ids): 2015-2018 from formula1.com's old team
+  pages (the logo each season's page drew, a Wayback Machine `id_` copy captured that season, one row per season); 2002-2015
+  from Wikimedia Commons files tagged public domain (PD-textlogo / PD-ineligible; each row names its file page and license
+  and spans the seasons its description or the team's entry name dates it to). formula1.com's 2003-2014 site had no team logos.
 - CFL: the league's own logo service (`content.cfl.ca/logos/{abbr}-{primary,dark}.svg`, the files cfl.ca draws), keyed by
   ESPN team id (79-87; ESPN lists the teams with no logo). SVGs only: the service's PNGs are different artwork. Plus the
   CFL league mark and its French (LCF) version.
