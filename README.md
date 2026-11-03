@@ -92,6 +92,9 @@ Official sources only:
 - CFL: the league's own logo service (`content.cfl.ca/logos/{abbr}-{primary,dark}.svg`, the files cfl.ca draws), keyed by
   ESPN team id (79-87; ESPN lists the teams with no logo). SVGs only: the service's PNGs are different artwork. Plus the
   CFL league mark and its French (LCF) version.
+- NCAA Division II / III football conference logos (ESPN and NCAA.com serve none), each the conference's own site mark
+  pinned to a Wayback Machine `id_` copy and keyed by ESPN's college-football group id (`curated/conference_marks.csv`;
+  source `wayback`, league `cfb`, as `espn_groups` keys the FBS / FCS conferences).
 
 Non-free Wikipedia files and third-party logo sites (sportslogos.net, Sports Reference) are never captured here.
 Third-party reference captures, kept only as evidence of when a mark changed, live in the private tier

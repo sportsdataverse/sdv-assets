@@ -990,8 +990,22 @@ def cfl(session):
     return out
 
 
+def curated_conference_marks(session):
+    """NCAA Division II / III football conference logos, which neither ESPN (its D-II / D-III groups carry no logos) nor
+    NCAA.com serves: each is the conference's own site mark (mostly SIDEARM's ``images/logos/site/site.png``) as the
+    Wayback Machine archived it (``id_``), checked by eye (``curated/conference_marks.csv``). A conference site has no API
+    to re-validate against, so the row is pinned to a snapshot. Keyed by ESPN's college-football group id, the id
+    ``espn_groups`` keys the FBS / FCS conferences by."""
+    with open(CURATED / "conference_marks.csv", newline="") as f:
+        return [
+            row("conference", t["league"], t["entity_id"], t["name"], t["wayback"], "wayback", variant=t["variant"])
+            for t in csv.DictReader(f)
+        ]
+
+
 SOURCES = [
     espn_teams, espn_groups, espn_static, nhl_catalog, nhl_playoff_marks, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback, ncaa_com, wayback_marks,
     f1_media, cebl, easl, lba,
     cfl,
+    curated_conference_marks,
 ]
