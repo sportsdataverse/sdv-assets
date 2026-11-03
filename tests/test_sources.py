@@ -467,3 +467,20 @@ def test_curated_conference_marks_are_wayback_copies_keyed_by_espn_group_id():
     assert by_id["129"]["url"].endswith("://northernsun.org/images/logos/site/site.png")  # NSIC, ESPN group 129
     assert by_id["187"]["variant"] == "on_dark"  # Conference Carolinas' site mark is white
     assert {"112", "113"}.isdisjoint(ids)  # ESPN's D-II / D-III independents are no conference
+
+
+def test_an_unreachable_proxy_falls_back_to_direct_for_the_run(monkeypatch):
+    monkeypatch.setenv("SDV_ASSETS_API_PROXY", "http://user:pass@proxy.invalid:7000")
+    monkeypatch.setattr(sources, "_PROXY_DOWN", [])
+    calls = []
+
+    class Session:
+        def get(self, url, proxies=None, **_):
+            calls.append(proxies)
+            if proxies:
+                raise sources.requests.exceptions.ProxyError("Unable to connect to proxy")
+            return _response(200, {"ok": True})
+
+    assert sources._get_json(Session(), "https://site.api.espn.com/a") == {"ok": True}
+    assert sources._get_json(Session(), "https://site.api.espn.com/b") == {"ok": True}
+    assert [bool(p) for p in calls] == [True, False, False]  # one failed proxied call, then direct

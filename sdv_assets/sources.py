@@ -91,10 +91,21 @@ def _get_json(session, url, use_proxy=True):
     """JSON API calls. ESPN's site API blocks datacenter IPs after heavy traffic, so these few calls can go
     through a proxy (SDV_ASSETS_API_PROXY, a full proxy URL); image downloads never do. The MLB Stats API
     refuses that proxy (403), so its calls pass ``use_proxy=False``."""
-    proxy = os.environ.get("SDV_ASSETS_API_PROXY") if use_proxy else None
-    r = session.get(url, headers=UA, timeout=60, proxies={"http": proxy, "https": proxy} if proxy else None)
+    proxy = os.environ.get("SDV_ASSETS_API_PROXY") if use_proxy and not _PROXY_DOWN else None
+    try:
+        r = session.get(url, headers=UA, timeout=60, proxies={"http": proxy, "https": proxy} if proxy else None)
+    except requests.exceptions.ProxyError as e:
+        if not proxy:
+            raise
+        # an unreachable proxy (its account lapsed, 2026-11-01) must not cost the whole capture: go direct for the run
+        print(f"proxy unreachable ({type(e).__name__}); API calls go direct for the rest of this run")
+        _PROXY_DOWN.append(True)
+        r = session.get(url, headers=UA, timeout=60)
     r.raise_for_status()
     return r.json()
+
+
+_PROXY_DOWN: list[bool] = []  # set once a proxied call fails to connect
 
 
 def _variant(rel):
