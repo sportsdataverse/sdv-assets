@@ -15,6 +15,7 @@ import os
 import re
 import time
 from pathlib import Path
+from urllib.parse import quote
 
 import requests
 
@@ -1033,9 +1034,33 @@ def curated_conference_marks(session):
         ]
 
 
+# The cfbplotR commit whose data-raw/wordmarks/ the rows point at; raw URLs pinned to it outlive the retired repo's main
+CFBPLOTR_COMMIT = "bbe7483a9c2947802efa91b71f8bad33ebdae68e"
+CFBPLOTR_WORDMARKS = f"https://raw.githubusercontent.com/sportsdataverse/cfbplotR/{CFBPLOTR_COMMIT}/data-raw/wordmarks"
+
+
+def cfbplotr_wordmarks(session):
+    """The 366 college wordmarks cfbplotR served (``data-raw/wordmarks/``), kept so its retirement loses none of them.
+    An owner-approved exception to the official-sources rule: most are sportslogos.net files, so every row is
+    ``source=cfbplotr-legacy`` and can be pulled as a set. ``curated/cfbplotr_wordmarks.csv`` keys each file by the ESPN id
+    of the logo cfbplotR's ``logo_ref.csv`` paired it with (league ``cfb`` for a football team, ``mbb`` for a
+    basketball-only school), and the conferences by the group id ``espn_groups`` uses. A row with no entity_id is a file
+    no archive team matches; it stays listed and is skipped. ``valid_from`` is left blank: the year in a file name is
+    sportslogos.net's dating, not cfbplotR's, and cfbplotR drew each mark for every season."""
+    with open(CURATED / "cfbplotr_wordmarks.csv", newline="", encoding="utf-8") as f:
+        return [
+            row(t["level"], t["league"], t["entity_id"], t["name"], f"{CFBPLOTR_WORDMARKS}/{quote(t['file'])}",
+                "cfbplotr-legacy", variant=t["variant"], mark_type="wordmark",
+                program={"cfb": "football", "mbb": "mens"}.get(t["league"]) if t["level"] == "team" else None)
+            for t in csv.DictReader(f)
+            if t["entity_id"]
+        ]
+
+
 SOURCES = [
     espn_teams, espn_groups, espn_static, nhl_catalog, nhl_playoff_marks, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback, ncaa_com, wayback_marks,
     f1_media, f1_history, cebl, easl, lba,
     cfl,
     curated_conference_marks,
+    cfbplotr_wordmarks,
 ]

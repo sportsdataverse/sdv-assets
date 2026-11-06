@@ -103,6 +103,9 @@ Official sources only:
   (`ncaa_mhockey:hockey-east`).
 
 Non-free Wikipedia files and third-party logo sites (sportslogos.net, Sports Reference) are never captured here.
+One named exception: cfbplotR's 366 college wordmarks, most of them sportslogos.net files, are kept here so the marks
+cfbplotR already served publicly survive its retirement. They are captured from a pinned cfbplotR commit, keyed in
+`curated/cfbplotr_wordmarks.csv`, and every row carries `source = cfbplotr-legacy` so the set can be pulled at once.
 Third-party reference captures, kept only as evidence of when a mark changed, live in the private tier
 (`sportsdataverse/sdv-assets-private`) and are never served.
 
