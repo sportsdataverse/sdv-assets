@@ -467,6 +467,24 @@ def test_soccer_competitions_merge_keeps_earlier_seasons(tmp_path):
     ]
 
 
+def test_a_failed_manifest_write_leaves_the_old_file_whole(tmp_path, monkeypatch):
+    from sdv_assets import capture
+
+    path = tmp_path / "marks.csv"
+    capture.write_csv(path, [{"a": "1"}], ["a"])
+    before = path.read_bytes()
+
+    def fail_midway(self, rows):
+        self.writer.writerow(["partial"])
+        raise OSError("disk full")
+
+    monkeypatch.setattr(capture.csv.DictWriter, "writerows", fail_midway)
+    with pytest.raises(OSError, match="disk full"):
+        capture.write_csv(path, [{"a": "2"}], ["a"])
+    assert path.read_bytes() == before
+    assert list(tmp_path.iterdir()) == [path]  # the temp file is gone too
+
+
 def test_cfl_rows_are_the_leagues_svgs_keyed_by_espn_team_id():
     rows = sources.cfl(None)
     teams = [r for r in rows if r["level"] == "team"]

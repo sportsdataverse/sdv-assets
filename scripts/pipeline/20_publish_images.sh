@@ -5,5 +5,5 @@ set -euo pipefail
 STORE="${SDV_ASSETS_STORE:-/mnt/sdv_repos/sdv-assets-store}"
 cd "$(dirname "$0")/../.."
 rclone copy "$STORE/sha256" sdvspaces:sdv/assets/public/sha256 --s3-acl public-read --ignore-existing --transfers 8 --stats-one-line --stats 30s
-rclone copy manifest sdvspaces:sdv/assets/public/manifest --s3-acl public-read --stats-one-line
+rclone copy manifest sdvspaces:sdv/assets/public/manifest --exclude ".*.tmp" --s3-acl public-read --stats-one-line
 echo "published $(find "$STORE/sha256" -type f | wc -l) images and the manifest"
