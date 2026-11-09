@@ -14,7 +14,7 @@ if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
 fi
 added=$(git diff --numstat -- manifest/marks.csv | awk '{print $1}')
 git checkout -q -b "$branch"
-git add manifest/*.csv
+git add -A -- manifest/  # -A stages a deleted CSV too; .gitignore keeps a leftover .*.tmp out
 git commit -q -m "data: monthly capture $(date -u +%F)"
 git push -q -u origin "$branch"
 gh pr create --base main --head "$branch" --title "data: monthly capture $(date -u +%F)" \
