@@ -144,16 +144,26 @@ def read_csv(path: Path) -> list[dict]:
 def write_csv(path: Path, rows: list[dict], fields: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     rows = sorted(rows, key=lambda r: tuple(str(r.get(k) or "") for k in fields))
-    with path.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
-        w.writeheader()
-        w.writerows(rows)
+    # Write beside the file, then rename over it, so a killed or failed capture leaves the old manifest whole for the
+    # later stages. The dot name keeps a leftover out of the manifest/*.csv glob, git (.gitignore) and stage 20's upload.
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")  # per process: two captures never share one
+    try:
+        with tmp.open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
+            w.writeheader()
+            w.writerows(rows)
+        tmp.replace(path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def merge_soccer_competitions(path: Path, rows: list[dict]) -> None:
     """Add this run's club-competition memberships to the file. Earlier seasons stay, so it builds a history the way
     marks.csv does; a row seen again replaces the old one (ESPN may rename a competition)."""
-    merged = {(r["competition"], r["season"], r["team_id"]): r for r in read_csv(path) + rows}
+    merged = {
+        (r["competition"], r["season"], r["team_id"]): r for r in read_csv(path) + rows
+    }
     write_csv(path, list(merged.values()), sources.SOCCER_COMPETITION_FIELDS)
 
 

@@ -6,3 +6,5 @@ store/
 .omc/
 logs/
 build/
+# write_csv temp files (sdv_assets/capture.py) a killed capture can leave behind
+manifest/.*.tmp
