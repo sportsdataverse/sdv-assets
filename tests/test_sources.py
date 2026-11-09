@@ -1,6 +1,7 @@
 import collections
 import csv
 import json
+from urllib.parse import quote
 
 import pytest
 import requests
@@ -538,6 +539,7 @@ def test_an_unreachable_proxy_falls_back_to_direct_for_the_run(monkeypatch):
 
 def test_cfbplotr_wordmarks_are_pinned_legacy_rows_keyed_by_espn_id():
     rows = sources.cfbplotr_wordmarks(None)
+    assert sources.cfbplotr_wordmarks in sources.SOURCES  # in the default capture, not only callable
     with open(sources.CURATED / "cfbplotr_wordmarks.csv", newline="", encoding="utf-8") as f:
         curated = list(csv.DictReader(f))
     assert len(curated) == 366 and len({t["file"] for t in curated}) == 366  # every cfbplotR file, listed once
@@ -551,4 +553,6 @@ def test_cfbplotr_wordmarks_are_pinned_legacy_rows_keyed_by_espn_id():
     assert by_key[("team", "cfb", "333")]["program"] == "football"  # Alabama, by the ESPN id of cfbplotR's logo
     assert by_key[("team", "mbb", "2250")]["program"] == "mens"  # Gonzaga, a basketball-only school
     assert by_key[("conference", "cfb", "8")]["program"] is None  # the SEC, ESPN group 8 as espn_groups keys it
+    # each URL is its own CSV file name, URL-quoted (not the name column, not unquoted)
+    assert [r["url"] for r in rows] == [f"{sources.CFBPLOTR_WORDMARKS}/{quote(t['file'])}" for t in curated if t["entity_id"]]
     assert "%26" in by_key[("team", "cfb", "50")]["url"]  # Florida A&M: the file name is URL-quoted
