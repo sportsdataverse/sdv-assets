@@ -146,7 +146,7 @@ def write_csv(path: Path, rows: list[dict], fields: list[str]) -> None:
     rows = sorted(rows, key=lambda r: tuple(str(r.get(k) or "") for k in fields))
     # Write beside the file, then rename over it, so a killed or failed capture leaves the old manifest whole for the
     # later stages. The dot name keeps a leftover out of the manifest/*.csv glob, git (.gitignore) and stage 20's upload.
-    tmp = path.with_name(f".{path.name}.tmp")
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")  # per process: two captures never share one
     try:
         with tmp.open("w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")

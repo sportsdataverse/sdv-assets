@@ -468,7 +468,8 @@ def test_soccer_competitions_merge_keeps_earlier_seasons(tmp_path):
     ]
 
 
-def test_a_failed_manifest_write_leaves_the_old_file_whole(tmp_path, monkeypatch):
+@pytest.mark.parametrize("step", ["write", "replace"])
+def test_a_failed_manifest_write_leaves_the_old_file_whole(tmp_path, monkeypatch, step):
     from sdv_assets import capture
 
     path = tmp_path / "marks.csv"
@@ -479,7 +480,13 @@ def test_a_failed_manifest_write_leaves_the_old_file_whole(tmp_path, monkeypatch
         self.writer.writerow(["partial"])
         raise OSError("disk full")
 
-    monkeypatch.setattr(capture.csv.DictWriter, "writerows", fail_midway)
+    def fail_replace(self, target):
+        raise OSError("disk full")
+
+    if step == "write":
+        monkeypatch.setattr(capture.csv.DictWriter, "writerows", fail_midway)
+    else:  # the temp file is complete, the rename fails
+        monkeypatch.setattr(capture.Path, "replace", fail_replace)
     with pytest.raises(OSError, match="disk full"):
         capture.write_csv(path, [{"a": "2"}], ["a"])
     assert path.read_bytes() == before
