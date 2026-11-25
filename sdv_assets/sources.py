@@ -1635,6 +1635,289 @@ def elh(session):
     ]
 
 
+# api2.acb.com, the .NET API behind acb.com. Its X-APIKEY is public (acb.com's bundle); this is sdv-py's DEFAULT_KEY
+# (sportsdataverse/basketball/acb/acb_runtime.py). The API keys a season by editionId = END year - 1936.
+ACB_API = "https://api2.acb.com/api/seasondata/TeamProfile/teams"
+ACB_KEY = os.environ.get("SDV_ASSETS_ACB_KEY", "0dd94928-6f57-4c08-a3bd-b1b2f092976e")
+# END year of the first season (2019-20, edition 84) whose every team carries a logo; 2010-11 has 2 of 18
+ACB_FIRST = 2020
+ACB_DELAY = 2.0
+
+
+def acb(session):
+    """Liga Endesa logos from the ACB's own API, every season from 2019-20 on, keyed by the club id (sdv-py
+    ``acb_teams`` ``club_id``; its ``team_id`` is a season entry, new every season). ``secondaryLogo`` (the negative
+    mark, for dark backgrounds) is variant ``dark`` when it is another file. ``valid_from`` / ``valid_to`` are SDV END
+    years; a file used in several seasons is one row spanning them."""
+    hdr = {**UA, "X-APIKEY": ACB_KEY, "Accept": "application/json"}
+
+    def edition(ed=None):
+        q = "competitionId=1" + (f"&editionId={ed}" if ed else "")
+        r = session.get(f"{ACB_API}?{q}", headers=hdr, timeout=60)
+        r.raise_for_status()
+        return r.json()
+
+    current = edition()  # no editionId: the current season
+    now = current["selectedFilters"]["season"]
+    span = {}
+    for ed in range(ACB_FIRST - 1936, now + 1):
+        if ed != now:
+            time.sleep(ACB_DELAY)
+        body = current if ed == now else edition(ed)
+        year = ed + 1936
+        for t in body.get("teams") or []:
+            t = t.get("selected") or {}
+            if t.get("editionId") != ed or not t.get("clubId"):
+                continue  # another season's answer
+            for variant, url in (
+                ("default", t.get("logo")),
+                ("dark", t.get("secondaryLogo")),
+            ):
+                if url and (variant == "default" or url != t.get("logo")):
+                    k = (str(t["clubId"]), variant, url)
+                    lo = span.get(k, (year,))[0]
+                    span[k] = (lo, year, t.get("fullName"))
+    if not span:
+        raise RuntimeError("acb: no season carried a team logo")
+    return [
+        row(
+            "team",
+            "acb",
+            cid,
+            name,
+            url,
+            "acb",
+            variant=variant,
+            program="pro",
+            valid_from=lo,
+            valid_to=hi,
+        )
+        for (cid, variant, url), (lo, hi, name) in span.items()
+    ]
+
+
+# FEB has no team-list route: sdv-py's feb_schedule reads the calendario page of baloncestoenvivo.feb.es (robots.txt
+# allows it). Each team links Equipo.aspx?i=<team_id> and shows imagenes.feb.es/Imagen.aspx?i=<team_id>&ti=1.
+FEB_SITE = "https://baloncestoenvivo.feb.es"
+FEB_LOGO = "https://imagenes.feb.es/imagen.aspx?i={}&ti=1"
+FEB_GROUPS = (
+    1,
+    2,
+    4,
+)  # the site's menu groups: Primera FEB, Segunda FEB, Liga Femenina Endesa
+FEB_FIRST = 2021  # END year of the LiveStats API's first season (2020-21); the pages go back further (2011-12 seen)
+FEB_DELAY = 2.0
+_FEB_TEAM = re.compile(r'Equipo\.aspx\?i=(\d+)">([^<]+)</a>')
+_FEB_IMG = re.compile(r"[Ii]magen\.aspx\?i=(\d+)&amp;ti=1")
+
+
+def feb(session):
+    """FEB team logos (Primera FEB, Segunda FEB, Liga Femenina Endesa), keyed by the FEB team id (sdv-py
+    ``feb_schedule`` ``home_team_id`` / ``away_team_id``, the API's ``team_id``). That id is a TEAM-SEASON registration,
+    new every season, so each row is one season (``valid_from`` = ``valid_to`` = the SDV END year). The site keys a
+    season by its START year and serves another season for one it lacks, so the final URL must echo the request."""
+    out = {}
+    first = True
+    for year in range(FEB_FIRST, dt.date.today().year + 2):
+        for g in FEB_GROUPS:
+            if not first:
+                time.sleep(FEB_DELAY)
+            first = False
+            r = session.get(f"{FEB_SITE}/calendario.aspx?g={g}&t={year - 1}", headers=UA, timeout=60)
+            if r.status_code == 404 or not r.url.rstrip("/").endswith(f"/calendario/{g}/{year - 1}"):
+                continue  # a group or season the site does not hold (it redirects to /error or to its default)
+            r.raise_for_status()
+            logos = set(_FEB_IMG.findall(r.text))
+            for tid, name in _FEB_TEAM.findall(r.text):
+                if tid in logos:
+                    out[tid] = row(
+                        "team",
+                        "feb",
+                        tid,
+                        name.strip(),
+                        FEB_LOGO.format(tid),
+                        "feb",
+                        program="pro",
+                        valid_from=year,
+                        valid_to=year,
+                    )
+    if not out:
+        raise RuntimeError("feb: no calendar page carried a team logo")
+    return list(out.values())
+
+
+# The SCB API behind easycredit-bbl.de (BBL) and toyota-dbbl.de (DBBL): x-api-key publicWebUser plus an x-api-secret
+# that rotates; it is the "key" embedded in an easycredit-bbl.de page, reversed, ':' -> '-' (sdv-py scb_runtime).
+# The secret is never printed. Logo files need no header and are per (season, team): /images/teams/logo/{season}/{id}.
+SCB_HOSTS = {
+    "bbl": "https://api.basketball-bundesliga.de",
+    "dbbl": "https://api-1.dbbl.scb.world",
+}
+SCB_KEY_PAGE = "https://www.easycredit-bbl.de/"
+SCB_DELAY = 2.0
+
+
+def scb(session):
+    """BBL and DBBL team logos from the SCB API, keyed by the SCB team id (sdv-py ``scb_season_teams`` ``team_id``;
+    ``season_team_id`` equals it). League ``bbl`` or ``dbbl`` (sdv-py's ``league`` argument): the two hosts share
+    one API and their ids are separate key spaces. Every season ``/seasons`` lists (BBL from 2002-03; DBBL answers no
+    teams before its first covered season); ``valid_from`` = ``valid_to`` = the SDV END year (seasonId + 1)."""
+    page = session.get(SCB_KEY_PAGE, headers={**UA, "Accept": "text/html"}, timeout=60)
+    page.raise_for_status()
+    key = next(
+        (k for k in re.findall(r'"key":"([^"]+)"', page.text) if re.fullmatch(r"[A-Za-z0-9:_-]{32,256}", k)),
+        None,
+    )
+    if key is None:
+        raise RuntimeError("scb: no API key on the easycredit-bbl.de page (layout changed)")
+    hdr = {
+        **UA,
+        "x-api-key": "publicWebUser",
+        "x-api-secret": key[::-1].replace(":", "-"),
+        "Accept": "application/json",
+    }
+
+    def get(url):
+        time.sleep(SCB_DELAY)
+        r = session.get(url, headers=hdr, timeout=60)
+        r.raise_for_status()
+        return r.json()
+
+    out = []
+    for league, host in SCB_HOSTS.items():
+        for sid in sorted(s["id"] for s in get(f"{host}/seasons")):
+            for t in get(f"{host}/seasons/{sid}").get("teams") or []:
+                if t.get("logoUrl") and t.get("teamId"):
+                    out.append(
+                        row(
+                            "team",
+                            league,
+                            t["teamId"],
+                            t.get("name"),
+                            t["logoUrl"],
+                            "scb",
+                            program="pro",
+                            valid_from=sid + 1,
+                            valid_to=sid + 1,
+                        )
+                    )
+    if not out:
+        raise RuntimeError("scb: no season carried a team logo")
+    return out
+
+
+# Infobasket, the Russian federation's stats platform behind vtb-league.com (sdv-py ``vtb_infobasket_*``; robots.txt
+# is a 404). The calendar of a season lists each game's two TeamIDs with their logo file. sdv-py flags the league as
+# sanctions-sensitive; the owner signed off on archiving its marks (2026-11-25).
+VTB_API = "https://org.infobasket.su"
+VTB_FIRST = 2027  # END year of the season probed
+VTB_DELAY = 2.0
+
+
+def vtb(session):
+    """VTB United League logos from Infobasket's season calendars, keyed by the Infobasket ``TeamID`` (sdv-py
+    ``vtb_infobasket_*`` and ``vtb_league_*`` ``team_id``, stable across seasons). ``valid_from`` / ``valid_to`` are
+    END years; a file used in several seasons is one row spanning them."""
+    comps = {
+        int(s["SeasonYear"]): s["CompID"]
+        for s in _get_json(
+            session,
+            f"{VTB_API}/Comp/GetSeasonsForTag?format=json&tag=vtb",
+            use_proxy=False,
+        )
+    }
+    span = {}
+    for year in sorted(y for y in comps if y >= VTB_FIRST):
+        time.sleep(VTB_DELAY)
+        for g in _get_json(
+            session,
+            f"{VTB_API}/Comp/GetCalendar/?comps={comps[year]}&format=json",
+            use_proxy=False,
+        ):
+            for side in "AB":
+                tid, url = g.get(f"Team{side}id"), g.get(f"TeamLogo{side}")
+                if tid and url:
+                    k = (str(int(tid)), url)
+                    lo, _, _ = span.get(k, (year, None, None))
+                    span[k] = (lo, year, g.get(f"CompTeamName{side}en"))
+    if not span:
+        raise RuntimeError("vtb: no season calendar carried a team logo")
+    return [
+        row(
+            "team",
+            "vtb",
+            tid,
+            name,
+            url,
+            "infobasket",
+            program="pro",
+            valid_from=lo,
+            valid_to=hi,
+        )
+        for (tid, url), (lo, hi, name) in span.items()
+    ]
+
+
+# W League (Japan, women): the keyless JSON backend of www.wjbl.org. Its team list (/teams/base) has no logo; the
+# schedule's home / away sides carry one, as a path on the league site. The API pages the schedule by month.
+WJBL_API = "https://api.wjbl.01core.app/api"
+WJBL_SITE = "https://www.wjbl.org"
+WJBL_DELAY = 2.0
+# a league edition ("25-26 Wリーグ"); all-star games and cups have their own
+WJBL_EDITION = re.compile(r"\d\d-\d\d Wリーグ")
+
+
+def wjbl(session):
+    """W League team logos from the latest league edition's schedule, keyed by the franchise id (sdv-py
+    ``wjbl_teams`` ``team_id``, stable across seasons and sponsor renames). Every team that played in the edition,
+    Premier and Future divisions; the newest month's file wins if a team's logo changed in-season."""
+    editions = sorted(
+        (
+            x
+            for x in _get_json(session, f"{WJBL_API}/leagues", use_proxy=False)
+            if WJBL_EDITION.fullmatch(x.get("league_title") or "")
+        ),
+        key=lambda x: -int(x["league_id"]),
+    )
+    seen = {}
+    for edition in editions:  # newest first; an edition without games yet has no months
+        time.sleep(WJBL_DELAY)
+        q = f"league_id={edition['league_id']}"
+        months = _get_json(session, f"{WJBL_API}/play-schedule-months?{q}", use_proxy=False).get("game_months") or []
+        for m in months:
+            time.sleep(WJBL_DELAY)
+            body = _get_json(
+                session,
+                f"{WJBL_API}/play-schedules?{q}&game_month={m['game_month']}",
+                use_proxy=False,
+            )
+            for phase in (body.get("seasons") or {}).values():
+                for g in phase.get("play_schedules") or []:
+                    for side in ("home", "away"):
+                        tid, logo = (
+                            g.get(f"{side}_team_id"),
+                            g.get(f"{side}_team_logo_image"),
+                        )
+                        if tid and logo:
+                            seen.setdefault(str(tid), (g.get(f"{side}_season_team_name"), logo))
+        if months:
+            break
+    if not seen:
+        raise RuntimeError("wjbl: no schedule side carried a team logo")
+    return [
+        row(
+            "team",
+            "wjbl",
+            tid,
+            name,
+            WJBL_SITE + logo if logo.startswith("/") else logo,
+            "wjbl",
+            program="pro",
+        )
+        for tid, (name, logo) in seen.items()
+    ]
+
+
 F1_MEDIA = "https://media.formula1.com"
 # formula1.com's file names for the 2024+ SVGs -> variant: the white mark is for dark backgrounds, the black one for light
 F1_SVG_VARIANTS = [("logo", "default"), ("logowhite", "dark"), ("logoblack", "on_light")]
@@ -1759,6 +2042,7 @@ SOURCES = [
     espn_teams, espn_groups, espn_static, nhl_catalog, nhl_playoff_marks, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback, ncaa_com, wayback_marks,
     f1_media, f1_history, cebl, easl, lba,
     euroleague, bnxt, aba, ibba, kzs, lkl, dbl, nbl_rosetta, kbl, bleague, shl, ha, magnus, elh,
+    acb, feb, scb, vtb, wjbl,
     cfl,
     curated_conference_marks,
     cfbplotr_wordmarks,
