@@ -17,6 +17,7 @@ import io
 import os
 import sys
 import time
+import traceback
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -183,6 +184,7 @@ def main(names: list[str]) -> None:
             rows = src(session)
         except Exception as e:
             print(f"{src.__name__}: FAILED ({type(e).__name__}: {e})", flush=True)
+            traceback.print_exc()
             broken.append(src.__name__)
             continue
         print(f"{src.__name__}: {len(rows)} candidate marks", flush=True)
