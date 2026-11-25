@@ -17,6 +17,7 @@ import io
 import os
 import sys
 import time
+import traceback
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -175,8 +176,17 @@ def main(names: list[str]) -> None:
     chosen = [s for s in sources.SOURCES if not names or s.__name__ in names]
 
     candidates = []
+    broken = []
     for src in chosen:
-        rows = src(session)
+        # one source's host going down (or a league in its off-season) must not cost every other source's capture:
+        # its manifest rows stay as they are, and the run still exits non-zero
+        try:
+            rows = src(session)
+        except Exception as e:
+            print(f"{src.__name__}: FAILED ({type(e).__name__}: {e})", flush=True)
+            traceback.print_exc()
+            broken.append(src.__name__)
+            continue
         print(f"{src.__name__}: {len(rows)} candidate marks", flush=True)
         candidates += rows
     if sources.soccer_competitions:  # only when espn_soccer ran; a run over other sources leaves the file alone
@@ -237,6 +247,8 @@ def main(names: list[str]) -> None:
         f"{len(failures)} candidate rows failed",
         flush=True,
     )
+    if broken:
+        sys.exit(f"sources that failed: {', '.join(broken)}")
 
 
 if __name__ == "__main__":
