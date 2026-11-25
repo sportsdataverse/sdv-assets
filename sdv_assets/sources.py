@@ -10,6 +10,7 @@ from __future__ import annotations
 import collections
 import csv
 import datetime as dt
+import html
 import io
 import os
 import re
@@ -937,6 +938,703 @@ def lba(session):
     ]
 
 
+# EuroLeague's Competition Engine API (keyless; without Accept: application/json it answers XML). Every season's club
+# list carries each club's CURRENT crest (the same file for a club in E2000 and E2025), so seasons only add clubs.
+EUROLEAGUE_API = "https://api-live.euroleague.net/v2/competitions/E"
+EUROLEAGUE_DELAY = 2.0
+
+
+def euroleague(session):
+    """EuroLeague club crests from the league's own API, keyed by the club code (sdv-py ``euroleague_clubs`` ``code``,
+    the ``local_club_code`` / ``road_club_code`` of its game rows). Every club of every season the API lists, under
+    its latest season's name. No robots.txt on the host (404)."""
+    hdr = {**UA, "Accept": "application/json"}
+    r = session.get(f"{EUROLEAGUE_API}/seasons", headers=hdr, timeout=60)
+    r.raise_for_status()
+    today = dt.date.today().isoformat()
+    seasons = sorted(s["code"] for s in r.json().get("data") or [] if (s.get("activationDate") or "")[:10] <= today)
+    clubs = {}
+    for code in seasons:  # E2000 ... E2026: ascending, so the latest name wins
+        time.sleep(EUROLEAGUE_DELAY)
+        r = session.get(f"{EUROLEAGUE_API}/seasons/{code}/clubs", headers=hdr, timeout=60)
+        r.raise_for_status()
+        for c in r.json().get("data") or []:
+            if (c.get("images") or {}).get("crest") and c.get("code"):
+                clubs[c["code"]] = (c.get("name"), c["images"]["crest"])
+    if not clubs:
+        raise RuntimeError("euroleague: no season carried a club crest")
+    return [
+        row("team", "euroleague", code, name, url, "euroleague", program="pro") for code, (name, url) in clubs.items()
+    ]
+
+
+# BNXT's Sportpress backend. Its X-Authorization key is public (bnxtleague.com's bundle); this is sdv-py's
+# FALLBACK_KEY (sportsdataverse/basketball/bnxt/bnxt_runtime.py). robots.txt allows everything.
+BNXT_API = "https://bnxt.sportpress.info/api/v1/competition-team/all"
+BNXT_KEY = os.environ.get("SDV_ASSETS_BNXT_KEY", "BWSyE7sgg9QAurh2JX9cpjzjGc652BWLuNUS")
+# SDV END year -> competition id (one per season; sdv-py sportpress_phases maps them). 2020-21 (2) answers no teams.
+# ponytail: add each new season's id here (sportpress_phases(season)); a phase lookup per season if it gets tedious.
+BNXT_COMPETITIONS = {2022: 1, 2023: 3, 2024: 12, 2025: 22, 2026: 24, 2027: 25}
+BNXT_DELAY = 2.0
+
+
+def bnxt(session):
+    """BNXT League logos from its Sportpress backend, keyed by the stable club key ``uu_team_id`` (sdv-py
+    ``sportpress_competition_teams`` ``uu_team_id``; its ``competition_team_id`` is new every season, and a club can
+    have a second entry for the playoffs). ``valid_from`` / ``valid_to`` are SDV END years; a file used in several
+    seasons is one row spanning them."""
+    hdr = {
+        **UA,
+        "X-Authorization": BNXT_KEY,
+        "X-Localization": "en",
+        "Accept": "application/json",
+    }
+    span = {}
+    for i, (year, cid) in enumerate(sorted(BNXT_COMPETITIONS.items())):
+        if i:
+            time.sleep(BNXT_DELAY)
+        r = session.get(f"{BNXT_API}?competition_id={cid}", headers=hdr, timeout=60)
+        r.raise_for_status()
+        for t in r.json().get("data") or []:
+            url = (t.get("team_logo") or {}).get("public_url")
+            if url and t.get("uu_team_id") and t.get("competition_id") == cid:
+                k = (str(t["uu_team_id"]), url)
+                lo = span.get(k, (year,))[0]
+                span[k] = (lo, year, t.get("name"))
+    if not span:
+        raise RuntimeError("bnxt: no season carried a team logo")
+    return [
+        row(
+            "team",
+            "bnxt",
+            uid,
+            name,
+            url,
+            "sportpress",
+            program="pro",
+            valid_from=lo,
+            valid_to=hi,
+        )
+        for (uid, url), (lo, hi, name) in span.items()
+    ]
+
+
+PAGE_RETRY_DELAY = 10.0
+
+
+def _page(session, url):
+    """One HTML page of a site with no team-list API, or None when it has no such page (404) or keeps failing (5xx).
+    A dropped connection or a 5xx is tried once more after a pause; a 403 / 429 raises, so the source stops."""
+    for attempt in (0, 1):
+        try:
+            r = session.get(url, headers=UA, timeout=60)
+        except requests.ConnectionError:
+            if attempt:
+                raise
+        else:
+            if r.status_code == 404 or (attempt and r.status_code >= 500):
+                return None
+            if r.status_code < 500:
+                r.raise_for_status()
+                return r.text
+        time.sleep(PAGE_RETRY_DELAY)
+    return None
+
+
+# aba-liga.com has no team-list API: sdv-py's aba_standings reads /standings/{sez}/1/ (sez = END year - 2001). The
+# club id is global (every season, both leagues) and its crest is /images/club/100x100/{id}.png, the largest size the
+# site's pages use (50x50 too). robots.txt allows /standings/ and /images/ and sets Crawl-delay: 2.
+ABA_SITE = "https://www.aba-liga.com"
+ABA_FIRST = 2009  # END year of the earliest standings page probed (2008-09); the league began in 2001-02
+ABA_DELAY = 2.0
+
+
+def aba(session):
+    """ABA League crests, keyed by the ABA club id (sdv-py ``aba_standings`` / ``aba_box_teams`` ``team_id``). Every
+    club on a standings page since 2008-09, under its latest season's name. The crest is the club's current one (no
+    season in the file name), so rows carry no validity years."""
+    clubs = {}
+    for year in range(ABA_FIRST, dt.date.today().year + 2):
+        if year > ABA_FIRST:
+            time.sleep(ABA_DELAY)
+        sez = year - 2001
+        page = _page(session, f"{ABA_SITE}/standings/{sez}/1/")
+        for tid, name in re.findall(rf'/team/(\d+)/{sez}/1/0/[\w-]+/">\s*([^<]+?)\s*<', page or ""):
+            clubs[tid] = name
+    if not clubs:
+        raise RuntimeError("aba: no standings page listed a club")
+    return [
+        row(
+            "team",
+            "aba",
+            tid,
+            name,
+            f"{ABA_SITE}/images/club/100x100/{tid}.png",
+            "abaliga",
+            program="pro",
+        )
+        for tid, name in clubs.items()
+    ]
+
+
+# Israel Basketball Association's ASP.NET web service (sdv-py ``ibba_*``); robots.txt only disallows /SiteNew/,
+# /mgmt/ and /digital library/. ``cYear`` is the season END year. sdv-py spaces requests 1 s apart.
+IBBA_API = "https://basket.co.il/ws/ws.asmx/Teams"
+IBBA_SITE = "https://basket.co.il"
+IBBA_FIRST = 2015  # END year of the oldest season probed (2014-15: 12 of 12 teams carry team_icon2)
+IBBA_DELAY = 2.0
+
+
+def ibba(session):
+    """Israeli Premier League (Winner League) logos from the IBBA web service, every season from 2014-15 on, keyed
+    by the club id (sdv-py ``ibba_teams`` ``team_uid``; its ``team_id`` is a per-season registration, re-issued every
+    season, so game rows reach the club through ``ibba_teams``). ``valid_from`` / ``valid_to`` are END years (the
+    host's own ``cYear``); a file used in several seasons is one row spanning them. Logo paths are absolute or
+    site-relative and mix ``www.basket.co.il`` (which answers 301) with the bare host; both are normalised."""
+    span = {}
+    for year in range(IBBA_FIRST, _end_year_now() + 1):
+        if year > IBBA_FIRST:
+            time.sleep(IBBA_DELAY)
+        for t in _get_json(session, f"{IBBA_API}?cYear={year}&board_id=5", use_proxy=False).get("teams") or []:
+            icon = (t.get("team_icon2") or "").strip()
+            # a season the host has no teams for yet must not answer with another season's rows
+            if icon and t.get("TeamUID") and t.get("year_id") == str(year):
+                url = re.sub(
+                    r"^https?://(www\.)?basket\.co\.il",
+                    IBBA_SITE,
+                    icon if "://" in icon else IBBA_SITE + icon,
+                )
+                k = (str(int(t["TeamUID"])), url)
+                lo, _, _ = span.get(k, (year, None, None))
+                span[k] = (
+                    lo,
+                    year,
+                    html.unescape(t.get("teamEng") or "") or None,
+                )  # the latest season's name
+    if not span:
+        raise RuntimeError("ibba: no season carried a team logo")
+    return [
+        row(
+            "team",
+            "ibba",
+            uid,
+            name,
+            url,
+            "ibba",
+            program="pro",
+            valid_from=lo,
+            valid_to=hi,
+        )
+        for (uid, url), (lo, hi, name) in span.items()
+    ]
+
+
+# Basketball Federation of Slovenia's public API (sdv-py ``kzs_*``; api.kzs.si/robots.txt answers 401, no rules).
+# A team carries a ``logoUuid``; www.kzs.si's team-logo component (Nuxt chunk, FMS_STORAGE) serves it from
+# ``{FMS_STORAGE}/public/images/{uuid}``. Season ids are opaque: id = END year - 2000 for 2001-2030.
+KZS_API = "https://api.kzs.si/api/v1/public"
+KZS_IMAGES = "https://api.kzs.si/public/images"
+KZS_FIRST = 2027  # END year of the season probed (2026/2027 = season id 27)
+KZS_DELAY = 2.0
+
+
+def kzs(session):
+    """Slovenian men's first league (Liga OTP banka / Liga Nova KBM) logos, keyed by the KZS club id (sdv-py
+    ``kzs_teams`` ``club_id``; its ``team_id`` is one club team in one season). Each season's league is the
+    competition typed LEAGUE / ABSOLUTE / FIRST / MALE (its sponsor name changes). ``valid_from`` / ``valid_to`` are
+    END years; a file used in several seasons is one row spanning them."""
+    span = {}
+    league = ("LEAGUE", "ABSOLUTE", "FIRST", "MALE")
+    for year in range(KZS_FIRST, min(_end_year_now(), 2030) + 1):  # season ids past 2030 wrap to the 1990s
+        listed = _kzs_data(session, f"/competitions/?seasonId={year - 2000}&limit=10000") or {}
+        comps = [
+            c["id"]
+            for c in listed.get("items") or []
+            if (c.get("type"), c.get("category"), c.get("rank"), c.get("gender")) == league
+        ]
+        for cid in comps:
+            for t in (_kzs_data(session, f"/teams/?limit=1000&competitionId={cid}") or {}).get("items") or []:
+                app = t.get("teamApplication") or {}
+                club = (app.get("club") or {}).get("id")
+                if t.get("logoUuid") and club:
+                    k = (str(int(club)), f"{KZS_IMAGES}/{t['logoUuid']}")
+                    lo, _, _ = span.get(k, (year, None, None))
+                    span[k] = (lo, year, app.get("name"))
+    if not span:
+        raise RuntimeError("kzs: no season's first league carried a team logo")
+    return [
+        row(
+            "team",
+            "kzs",
+            club,
+            name,
+            url,
+            "kzs",
+            program="pro",
+            valid_from=lo,
+            valid_to=hi,
+        )
+        for (club, url), (lo, hi, name) in span.items()
+    ]
+
+
+def _end_year_now():
+    """END year of the season under way (a season starts in August)."""
+    today = dt.date.today()
+    return today.year + (today.month >= 8)
+
+
+def _kzs_data(session, path):
+    """One KZS call (every answer is ``{"status": "OK", "data": ...}``), spaced like sdv-py's runtime."""
+    time.sleep(KZS_DELAY)
+    body = _get_json(session, KZS_API + path, use_proxy=False)
+    if body.get("status") != "OK":
+        raise RuntimeError(f"kzs: {path} answered status {body.get('status')!r}")
+    return body.get("data")
+
+
+# lkl.lt has no team-list API. Its results page (robots.txt: ``Disallow:`` empty) carries the team filter select,
+# whose values are lkl.lt's team ids (6 = Rytas, the id the game page's teams-info gives), and every result row's
+# team link with the club's logo. Current teams only.
+LKL_PAGE = "https://lkl.lt/rezultatai"
+LKL_SITE = "https://lkl.lt"
+
+
+def lkl(session):
+    """LKL (Lithuania) logos of the current season's teams, keyed by lkl.lt's club id (sdv-py ``lkl_*`` ``team_id``,
+    stable across seasons and renamings). The id comes from the results page's LKL team select and the logo from the
+    page's team links, joined on the team name both print."""
+    r = session.get(LKL_PAGE, headers=UA, timeout=60)
+    r.raise_for_status()
+    page = r.text
+    select = re.search(r'<select[^>]*id="team-lkl"[^>]*>(.*?)</select>', page, re.S)
+    ids = (
+        {
+            html.unescape(n).strip(): v
+            for v, n in re.findall(r'<option[^>]*value="(\d+)"[^>]*>([^<]+)<', select.group(1))
+        }
+        if select
+        else {}
+    )
+    logos = {}
+    for body in re.findall(r'<a href="https://lkl\.lt/komandos/[^"]+"[^>]*>(.*?)</a>', page, re.S):
+        img = re.search(r'<img src="([^"]+)" alt="([^"]+)"', body)
+        if img:
+            logos.setdefault(html.unescape(img.group(2)).strip(), img.group(1))
+    out = [
+        row(
+            "team",
+            "lkl",
+            tid,
+            name,
+            logos[name] if "://" in logos[name] else LKL_SITE + logos[name],
+            "lkl",
+            program="pro",
+        )
+        for name, tid in ids.items()
+        if name in logos
+    ]
+    if not out:
+        raise RuntimeError("lkl: the results page carried no team logos")
+    return out
+
+
+# Basketligaen (Denmark) on the Sportality platform (sdv-py family ``sportality``, home ``basketball/dbl``; the
+# host serves its SPA for /robots.txt, so it has no rules). Standings carry each team's Genius team id and its logo
+# on Sportality's CDN, one file per team instance (``team-logos/{instance}.svg``). Current season only: the CDN keeps
+# one file per instance, not a history.
+DBL_API = "https://www.basketligaen.dk/api"
+DBL_LEAGUE_INSTANCE = "dbl1_dbl"  # teams without their own instance share the league's; its file is not a team mark
+
+
+def dbl(session):
+    """Basketligaen logos of the active regular season's teams, keyed by the Genius team id (sdv-py
+    ``sportality_standings`` ``team_id``; joins the ``genius`` family). The ssgt is read from layout-info."""
+    layout = _get_json(session, f"{DBL_API}/statistics-v2/layout-info", use_proxy=False)
+    ssgts = [
+        s
+        for s in (layout[0] if isinstance(layout, list) else layout).get("originalSeasonSeriesGameTypeTeams") or []
+        if (s.get("gameType") or {}).get("code") == "regular" and str((s.get("season") or {}).get("code")).isdigit()
+    ]
+    active = [s for s in ssgts if s.get("state") == "active"] or ssgts
+    if not active:
+        raise RuntimeError("dbl: layout-info listed no regular-season ssgt")
+    ssgt = max(active, key=lambda s: int(s["season"]["code"]))
+    time.sleep(2.0)
+    out = []
+    for r in (
+        _get_json(
+            session,
+            f"{DBL_API}/gameday/team-standings/{ssgt['ssgtUuid']}",
+            use_proxy=False,
+        ).get("leagueStandings")
+        or []
+    ):
+        info = r.get("info") or {}
+        team = info.get("teamInfo") or {}
+        if team.get("teamMedia") and info.get("teamId") and team.get("teamOwnerInstanceId") != DBL_LEAGUE_INSTANCE:
+            out.append(
+                row(
+                    "team",
+                    "dbl",
+                    int(info["teamId"]),
+                    (team.get("teamNames") or {}).get("full"),
+                    team["teamMedia"],
+                    "sportality",
+                    program="pro",
+                )
+            )
+    if not out:
+        raise RuntimeError("dbl: the standings carried no team logos")
+    return out
+
+
+# NBL / WNBL team directories from Rosetta, the JSON proxy behind nbl.com.au. Not a key but a referer gate: without
+# Origin / Referer = nbl.com.au every route answers 403 MISSING_API_KEY (sdv-py nbl_rosetta_runtime.GATE_HEADERS).
+NBL_ROSETTA = "https://prod.rosetta.nbl.com.au/get"
+NBL_ROSETTA_GATE = {
+    "Origin": "https://www.nbl.com.au",
+    "Referer": "https://www.nbl.com.au/",
+}
+# (Rosetta org, sdv-assets league). "nbl" is taken by ESPN's feed (ESPN ids), so Rosetta's NBL is "nbl_au".
+# ponytail: org nbl1 left out: sdv-py's nbl1 key is the atrium family; add ("nbl1", "nbl1") once its team_id is
+# confirmed to be the same DataCore UUID.
+NBL_ROSETTA_ORGS = [("nbl", "nbl_au"), ("wnbl", "wnbl")]
+NBL_ROSETTA_DELAY = 2.0
+DATACORE_IMG = "images.dc.connect.sportradar.com"
+
+
+def _datacore_original(url):
+    """DataCore serves the original file at ``?size=RAW`` (the EASL rows use it); Rosetta asks for 100-800 px webp."""
+    return url.split("?", 1)[0] + "?size=RAW" if DATACORE_IMG in url else url
+
+
+def nbl_rosetta(session):
+    """NBL and WNBL team logos from Rosetta's team directory, keyed by the DataCore team id (sdv-py
+    ``nbl_rosetta_teams`` ``team_id``, the body's ``external_id``). The directory holds every side the org has
+    listed (defunct, exhibition and visiting clubs too); most records carry no logo. ``team_logo`` is the site's own
+    file, ``external_team_logo`` DataCore's; the second is kept as variant ``datacore`` when it is another image."""
+    out = []
+    for i, (org, league) in enumerate(NBL_ROSETTA_ORGS):
+        if i:
+            time.sleep(NBL_ROSETTA_DELAY)
+        r = session.get(
+            f"{NBL_ROSETTA}/{org}/teams?limit=5000",
+            headers={**UA, **NBL_ROSETTA_GATE},
+            timeout=60,
+        )
+        r.raise_for_status()
+        for t in r.json().get("data") or []:
+            urls = [_datacore_original(u) for u in (t.get("team_logo"), t.get("external_team_logo")) if u]
+            if not urls or not t.get("external_id"):
+                continue
+            out.append(
+                row(
+                    "team",
+                    league,
+                    t["external_id"],
+                    t.get("name"),
+                    urls[0],
+                    "nbl_rosetta",
+                    program="pro",
+                )
+            )
+            if urls[-1] != urls[0]:
+                out.append(
+                    row(
+                        "team",
+                        league,
+                        t["external_id"],
+                        t.get("name"),
+                        urls[-1],
+                        "nbl_rosetta",
+                        variant="datacore",
+                        program="pro",
+                    )
+                )
+    if not out:
+        raise RuntimeError("nbl_rosetta: the team directories carried no logos")
+    return out
+
+
+# KBL (Korea): api.kbl.or.kr, the data API behind www.kbl.or.kr. It answers 400 unless Channel and TeamCode are sent
+# (any value; sdv-py kbl_runtime.HEADERS). The team list names each club's CSS logo class (teamLogoClass), and the
+# site's stylesheet (/assets/css/style.css) draws class X from /assets/img/ico/logo/ic-X.svg.
+KBL_API = "https://api.kbl.or.kr"
+KBL_HEADERS = {"Channel": "WEB", "TeamCode": "XX", "Accept": "application/json"}
+KBL_LOGOS = "https://www.kbl.or.kr/assets/img/ico/logo"
+
+
+def kbl(session):
+    """KBL logos of the current clubs, keyed by the two-digit team code (sdv-py ``kbl_teams`` ``team_code``, a string
+    with its leading zero; it is not stable across ownership changes). The list holds the current season's clubs."""
+    r = session.get(f"{KBL_API}/common/teamList", headers={**UA, **KBL_HEADERS}, timeout=60)
+    r.raise_for_status()
+    # ponytail: the ic-X-dark.svg files (one per class, kgc's is ic-kgc-dark-line.svg) are left out until a variant
+    # name for them is settled
+    out = [
+        row(
+            "team",
+            "kbl",
+            t["teamCode"],
+            t.get("teamNameFullEn") or t.get("teamNameFull"),
+            f"{KBL_LOGOS}/ic-{t['teamLogoClass']}.svg",
+            "kbl",
+            program="pro",
+        )
+        for t in r.json()
+        if t.get("teamCode") and t.get("teamLogoClass")
+    ]
+    if not out:
+        raise RuntimeError("kbl: the team list carried no logo class")
+    return out
+
+
+# B.LEAGUE (Japan): the standings page (www.bleague.jp/standings/?year=START&tab=1|2|3) links every club to
+# club_detail/?TeamID=N beside its logo, filed per season (.../img/logo/{START year}/s/{code}.png). No JSON team list
+# exists; sdv-py reads the same page (bleague_standings) and the schedule page's club filter.
+BLEAGUE_SITE = "https://www.bleague.jp"
+BLEAGUE_FIRST = 2016  # START year of the first season (2016-17)
+BLEAGUE_TABS = (1, 2, 3)  # B1, B2, B3
+BLEAGUE_DELAY = 2.0  # robots.txt sets a Crawl-delay only for msnbot (10) and bingbot (30)
+_BLEAGUE_ROW = re.compile(r'club_detail/\?TeamID=(\d+)">\s*<div class="team-logo">\s*<img src="([^"]+)" alt="([^"]*)"')
+
+
+def bleague(session):
+    """B.LEAGUE club logos from the standings pages of every season and division, keyed by the club id (sdv-py
+    ``bleague_standings`` / ``bleague_schedule_clubs`` ``team_id``, stable across seasons and renames). The site files
+    a logo per season; ``valid_from`` / ``valid_to`` are SDV ending years, and a file reused across seasons is one row
+    spanning them (the site re-files every logo each season, so in practice a row is one season)."""
+    span = {}
+    first = True
+    for year in range(BLEAGUE_FIRST, dt.date.today().year + 1):
+        for tab in BLEAGUE_TABS:
+            if not first:
+                time.sleep(BLEAGUE_DELAY)
+            first = False
+            page = _page(session, f"{BLEAGUE_SITE}/standings/?year={year}&tab={tab}")
+            for tid, src, name in _BLEAGUE_ROW.findall(page or ""):
+                if f"/img/logo/{year}/" not in src:  # a season the site lacks may answer with another season's page
+                    continue
+                k = (
+                    tid,
+                    re.sub(r"/v=\d+/", "/", src),
+                )  # drop the cache-buster: the file answers without it
+                lo, _, _ = span.get(k, (year + 1, None, None))
+                span[k] = (lo, year + 1, name)
+    if not span:
+        raise RuntimeError("bleague: no standings page carried a club logo")
+    return [
+        row(
+            "team",
+            "bleague",
+            tid,
+            name,
+            url,
+            "bleague",
+            program="pro",
+            valid_from=lo,
+            valid_to=hi,
+        )
+        for (tid, url), (lo, hi, name) in span.items()
+    ]
+
+
+# The SHL site's own API (Sportality platform, stats by StatNet). No robots.txt (the path answers the site's HTML
+# error page). Team marks sit on Sportality's CDN, one SVG per team named after its Sportality site id.
+SHL_API = "https://www.shl.se/api"
+SHL_DELAY = 2.0  # sdv-py's European hockey politeness ruling is >=1 s per host; sdv-assets uses 2
+
+
+def shl(session):
+    """SHL team logos, keyed by the StatNet team code (sdv-py's SHL ``team_id`` / ``team_code``, e.g. ``FHC``; codes
+    can be mixed case or non-ASCII: ``MoDo``, ``ÖRE``). ``layout-info`` lists every SHL season's teams since 1975-76
+    with their Sportality site id; ``all-sites`` of the active season gives each current team's icon. A past team it
+    does not list gets the CDN file named after its site id (``team-logos/<site id>.svg``: every listed icon is named
+    that way, in the 1985-86 answer as in the current one), which capture confirms or drops."""
+    layout = _get_json(session, f"{SHL_API}/statistics-v2/layout-info", use_proxy=False)
+    layout = layout[0] if isinstance(layout, list) and layout else layout
+    teams = {}  # site id -> (team code, name)
+    for ssgt in layout.get("originalSeasonSeriesGameTypeTeams") or []:
+        for t in ssgt.get("teams") or []:
+            code = (t.get("name") or {}).get("code")
+            if code and t.get("instanceId"):
+                teams[t["instanceId"]] = (
+                    code,
+                    (t.get("teamNames") or {}).get("long") or t["name"].get("medium"),
+                )
+    active = (layout.get("ssgtDefaultValue") or {}).get("ssgtUuid")
+    if not teams or not active:
+        raise RuntimeError("shl: layout-info carried no teams or no active season")
+    time.sleep(SHL_DELAY)
+    icons = {
+        s["id"]: s["icon"]
+        for s in _get_json(session, f"{SHL_API}/sports-v2/all-sites/{active}", use_proxy=False)
+        if s.get("id") and s.get("icon")
+    }
+    if not icons:
+        raise RuntimeError("shl: all-sites carried no team icons")
+    cdn = next(iter(icons.values())).rsplit("/", 1)[0]
+    return [
+        row(
+            "team",
+            "shl",
+            code,
+            name,
+            icons.get(site, f"{cdn}/{site}.svg"),
+            "shl",
+            program="pro",
+        )
+        for site, (code, name) in teams.items()
+    ]
+
+
+# HockeyAllsvenskan's own Next.js API (keyless, POST bodies; no robots.txt). Every stats body carries the season's
+# ``teams`` list with the logo in five sizes on ha-media.hadigital.se. Each season serves the CURRENT file of each team
+# (AIK's 2009-10 and 2026-27 entries are the same file), so a row carries no validity window.
+HA_API = "https://hockeyallsvenskan.se/api/all-time-goalkeepers-stats"
+HA_FIRST = 2006  # END year of the first season with stats (2005-06), sdv-py ha_runtime.FIRST_SEASON
+HA_DELAY = 2.0
+HA_BODY = {
+    "league": "HA",
+    "phase": "HA",
+    "team_side": "all",
+    "team": "all",
+    "against_team": "all",
+    "all_results": "all",
+    "game_status": "all",
+    "decided_in": "all",
+    "categories": "summary",
+    "page": 1,
+    "page_size": 1000,
+}
+
+
+def ha(session):
+    """HockeyAllsvenskan team logos (the ``xlarge`` size), keyed by the StatNet team id (sdv-py ``ha_teams``
+    ``team_statnet_id``, e.g. ``MIK``; HA frames have no ``team_id`` column, and ``team_code`` is the display code,
+    ``MORA``). Every season from 2005-06 on, so teams no longer in the league keep their mark; the latest season's
+    file and name win. The site keys a season by its START year; ``HA_FIRST`` is an SDV END year."""
+    today = dt.date.today()
+    last = today.year + (today.month >= 7)  # END year of the season in progress
+    marks = {}
+    for end in range(HA_FIRST, last + 1):
+        if end > HA_FIRST:
+            time.sleep(HA_DELAY)
+        r = session.post(
+            HA_API,
+            json={**HA_BODY, "season": str(end - 1)},
+            headers={**UA, "Accept": "application/json"},
+            timeout=60,
+        )
+        r.raise_for_status()
+        for t in r.json().get("teams") or []:
+            url = (t.get("logos") or {}).get("xlarge")
+            if t.get("statNetId") and url:
+                marks[t["statNetId"]] = (t.get("fullName") or t.get("name"), url)
+    if not marks:
+        raise RuntimeError("ha: no season carried a team logo")
+    return [row("team", "ha", tid, name, url, "hockeyallsvenskan", program="pro") for tid, (name, url) in marks.items()]
+
+
+# The French federation's backend behind liguemagnus.com (WordPress admin-ajax; robots.txt allows it). Logos are on
+# the federation's hockeynet.fr storage.
+MAGNUS_AJAX = "https://liguemagnus.com/wp-admin/admin-ajax.php"
+MAGNUS_DELAY = 2.0
+
+
+def _magnus(session, query):
+    body = _get_json(session, f"{MAGNUS_AJAX}?{query}", use_proxy=False)
+    if not body.get("success"):
+        raise RuntimeError(f"magnus: {query} answered success=false")
+    data = body.get("data")
+    return data.get("data") if isinstance(data, dict) else data
+
+
+def magnus(session):
+    """Ligue Magnus team logos, keyed by the federation's team id (sdv-py ``magnus_teams`` ``team_id``, stable across
+    seasons). One ``get_equipes`` call without a phase lists every team of every competition the federation runs; a
+    team is kept when it entered a Ligue Magnus competition (one per season from 2020-21, from
+    ``get_competition_by_type``). A club can field several team ids over the years (Mulhouse has three); each keeps
+    the logo the federation shows for it now, so a row carries no validity window."""
+    comps = {c["id"] for c in _magnus(session, "action=get_competition_by_type&id_type=1") or [] if c.get("id")}
+    time.sleep(MAGNUS_DELAY)
+    out = [
+        row(
+            "team",
+            "magnus",
+            t["id"],
+            t.get("libelle_complet"),
+            t["logo"],
+            "hockeyfrance",
+            program="pro",
+        )
+        for t in _magnus(session, "action=get_equipes") or []
+        if t.get("id") and t.get("logo") and comps & set(t.get("id_compet") or [])
+    ]
+    if not out:
+        raise RuntimeError("magnus: no Ligue Magnus team carried a logo")
+    return out
+
+
+# Not viable, so no source here: DEL (`del_`), ICE Hockey League (`icehl`), EIHL (`eihl`), Metal Ligaen (`metal`).
+# The four eSports hokejovyzapis buckets name a team only as {id, name, shortcut} (league-matches `home` / `guest`,
+# tables `clubs` / `tableData.table`, game-header `teamInfo`), and the game-center widget's `homeTeamLogoUrl` /
+# `images.homeTeamLogo` are null both in sdv-py's fixtures and live (ICEHL match 8479, Metal match 622, 2026-11-25).
+# The only upload paths in any payload hold hashed file names (`icehl.hokejovyzapis.cz/upload/television/logo/_<hash>_
+# <ts>_<name>.jpg`, `esports.ice.hockey/upload/player/photo/<id>_<hash>_<ts>_<name>.png`), so a team id gives no URL.
+
+
+# Czech Extraliga. sdv-py's `elh_scoreboard` (the eSports scoreboard, league 101) names each day's teams in both id
+# spaces; hokej.cz's public, listable S3 bucket keeps one PNG per hokej.cz team id in logos/{30,76,120,200,original}/.
+ELH_SCOREBOARD = "https://json.esports.cz/hokejcz/scoreboard"
+ELH_LOGOS = "https://s3-eu-west-1.amazonaws.com/hokej.cz/logos/200"
+ELH_LEAGUE = "101"  # Tipsport extraliga's key in the scoreboard
+ELH_DAYS = (
+    14  # the scoreboard keeps a rolling window of recent days (today answers 404); a national-team break is shorter
+)
+ELH_DELAY = 2.0  # one request at a time to the eSports host (sdv-py euro_hockey_runtime asks >= 1 s)
+
+
+def elh(session):
+    """Czech Extraliga logos from hokej.cz's bucket, keyed by the hokej.cz team id (sdv-py ``elh_scoreboard``
+    ``hokejcz_home_team_id`` / ``hokejcz_away_team_id``, ``elh_shots`` ``hokejcz_team_id``; not the onlajny id the
+    play-by-play uses). The teams are those that played in the scoreboard's last ``ELH_DAYS`` days, so the source finds
+    none in the off-season; each file is the team's current mark, overwritten in place, so rows carry no season."""
+    teams = {}
+    today = dt.date.today()
+    for back in range(1, ELH_DAYS + 1):
+        if back > 1:
+            time.sleep(ELH_DELAY)
+        r = session.get(
+            f"{ELH_SCOREBOARD}/{today - dt.timedelta(days=back)}.json",
+            headers=UA,
+            timeout=60,
+        )
+        if r.status_code == 404:  # a day outside the window
+            continue
+        r.raise_for_status()
+        for g in (r.json().get(ELH_LEAGUE) or {}).get("matches") or []:
+            for side in ("home", "visitor"):
+                t = g.get(side) or {}
+                if t.get("hokejcz_id"):
+                    teams[str(t["hokejcz_id"])] = t.get("name")
+    if not teams:
+        raise RuntimeError(f"elh: no Extraliga game in the scoreboard's last {ELH_DAYS} days")
+    return [
+        row(
+            "team",
+            "elh",
+            tid,
+            name,
+            f"{ELH_LOGOS}/{tid}.png",
+            "hokej.cz",
+            program="pro",
+        )
+        for tid, name in sorted(teams.items(), key=lambda kv: int(kv[0]))
+    ]
+
+
 F1_MEDIA = "https://media.formula1.com"
 # formula1.com's file names for the 2024+ SVGs -> variant: the white mark is for dark backgrounds, the black one for light
 F1_SVG_VARIANTS = [("logo", "default"), ("logowhite", "dark"), ("logoblack", "on_light")]
@@ -1060,6 +1758,7 @@ def cfbplotr_wordmarks(session):
 SOURCES = [
     espn_teams, espn_groups, espn_static, nhl_catalog, nhl_playoff_marks, mlbstatic, nflverse, espn_soccer, espn_seasons, hockeytech, milb, fox_usfl, espn_cricket, aaf_strip, phf_wayback, ncaa_com, wayback_marks,
     f1_media, f1_history, cebl, easl, lba,
+    euroleague, bnxt, aba, ibba, kzs, lkl, dbl, nbl_rosetta, kbl, bleague, shl, ha, magnus, elh,
     cfl,
     curated_conference_marks,
     cfbplotr_wordmarks,
