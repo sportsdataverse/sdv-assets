@@ -988,11 +988,17 @@ def test_feb_reads_team_season_ids_off_the_calendar_and_skips_a_page_for_another
     )  # Palencia's crest is not on this cut-down page: no row
 
     class Session:
+        def __init__(self, status=200):
+            self.status = status
+
         def get(self, url, **_):
             g = int(url.split("g=")[1].split("&")[0])
-            final = f"{sources.FEB_SITE}/calendario/{g}/{t if g == 1 else t - 1}"  # groups 2 and 4 answer another season
-            return _response(200, url=final, text=page)
+            start = t if g == 1 else t - 1  # groups 2 and 4 answer another season, at the URL asked for
+            season = f'<option selected="selected" value="{start}">{start}/{start + 1}</option>'
+            return _response(self.status, url=url, text=season + page)
 
+    with pytest.raises(requests.HTTPError):
+        sources.feb(Session(403))
     rows = sources.feb(Session())
     assert [
         (

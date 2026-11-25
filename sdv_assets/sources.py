@@ -1715,7 +1715,8 @@ def feb(session):
     """FEB team logos (Primera FEB, Segunda FEB, Liga Femenina Endesa), keyed by the FEB team id (sdv-py
     ``feb_schedule`` ``home_team_id`` / ``away_team_id``, the API's ``team_id``). That id is a TEAM-SEASON registration,
     new every season, so each row is one season (``valid_from`` = ``valid_to`` = the SDV END year). The site keys a
-    season by its START year and serves another season for one it lacks, so the final URL must echo the request."""
+    season by its START year and serves another season for one it lacks, so the page's selected season must be the
+    one asked for."""
     out = {}
     first = True
     for year in range(FEB_FIRST, dt.date.today().year + 2):
@@ -1724,9 +1725,12 @@ def feb(session):
                 time.sleep(FEB_DELAY)
             first = False
             r = session.get(f"{FEB_SITE}/calendario.aspx?g={g}&t={year - 1}", headers=UA, timeout=60)
-            if r.status_code == 404 or not r.url.rstrip("/").endswith(f"/calendario/{g}/{year - 1}"):
-                continue  # a group or season the site does not hold (it redirects to /error or to its default)
+            if r.status_code == 404:
+                continue
             r.raise_for_status()
+            # a season the site does not hold answers 200, at the season's own URL, with its default season's page
+            if f'<option selected="selected" value="{year - 1}">{year - 1}/{year}<' not in r.text:
+                continue
             logos = set(_FEB_IMG.findall(r.text))
             for tid, name in _FEB_TEAM.findall(r.text):
                 if tid in logos:
