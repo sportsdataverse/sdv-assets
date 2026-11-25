@@ -17,17 +17,17 @@ mark after its source changes.
 | Column | Meaning |
 |---|---|
 | `level` | `team`, `division`, `conference`, `league` |
-| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket`, `aaf`, `nbagl`, `ncaa_baseball`, `ncaa_softball`, `ncaa_mhockey`, `ncaa_whockey`, `phf`, `nbl`, `fiba`, `iihf`, `sphl`, `chl`, `bchl`, `ajhl`, `sjhl`, `ojhl`, `cchl`, `gojhl`, `mhl`, `nojhl`, `vijhl`, `kijhl`, `mjhl`, `f1`, `cebl`, `easl`, `lba`, `cfl`, `euroleague`, `bnxt`, `aba`, `ibba`, `kzs`, `lkl`, `dbl`, `nbl_au`, `wnbl`, `kbl`, `bleague`, `shl`, `ha`, `magnus`, `elh` |
+| `league` | `nfl`, `nba`, `wnba`, `mlb`, `nhl`, `cfb`, `mbb`, `wbb`, `ncaa`, `soccer`, `ufl`, `xfl`, `usfl`, `pwhl`, `ahl`, `ohl`, `whl`, `qmjhl`, `ushl`, `echl`, `milb`, `cricket`, `aaf`, `nbagl`, `ncaa_baseball`, `ncaa_softball`, `ncaa_mhockey`, `ncaa_whockey`, `phf`, `nbl`, `fiba`, `iihf`, `sphl`, `chl`, `bchl`, `ajhl`, `sjhl`, `ojhl`, `cchl`, `gojhl`, `mhl`, `nojhl`, `vijhl`, `kijhl`, `mjhl`, `f1`, `cebl`, `easl`, `lba`, `cfl`, `euroleague`, `bnxt`, `aba`, `ibba`, `kzs`, `lkl`, `dbl`, `nbl_au`, `wnbl`, `kbl`, `bleague`, `shl`, `ha`, `magnus`, `elh`, `acb`, `feb`, `bbl`, `dbbl`, `vtb`, `wjbl` |
 | `entity_id`, `entity_name` | The source's id and name for the team, group or league |
 | `program` | `pro`, `football`, `mens`, `womens` (Tennessee's Lady Vols mark is a `womens` row), `junior` (OHL/WHL/QMJHL/USHL and the junior A leagues), `national` (a `fiba` / `iihf` national team ESPN lists under one id for both genders, or with no gender), and the MiLB level (`aaa`, `aa`, `high_a`, `single_a`, `short_a`, `rookie`) |
 | `mark_type`, `variant` | `logo` / `wordmark`; `default`, `dark`, the ESPN brand-set variants, `on_light` / `on_dark`, … |
-| `valid_from`, `valid_to` | Seasons the source says the mark was used, where it says so (the NHL catalog, HockeyTech, the NHL playoff bracket, ESPN's XFL/UFL season lists, Lega Basket, BNXT, the IBBA, KZS and B.LEAGUE do); blank otherwise. One row per image, so a file used again after a gap spans the gap |
+| `valid_from`, `valid_to` | Seasons the source says the mark was used, where it says so (the NHL catalog, HockeyTech, the NHL playoff bracket, ESPN's XFL/UFL season lists, Lega Basket, BNXT, the IBBA, KZS, B.LEAGUE, ACB, FEB, the SCB API and VTB do); blank otherwise. One row per image, so a file used again after a gap spans the gap |
 | `source`, `url` | Where it was captured from |
 | `sha256`, `ext`, `bytes`, `width`, `height` | The image (SVGs have no pixel size) |
 | `archive_url` | Where the archived copy is served |
 | `first_seen`, `last_seen` | Capture dates. When a URL starts serving new bytes, a new row appears and the old row keeps its `last_seen` |
 
-Seasons follow SportsDataverse conventions: the ending year for NHL, NBA, college basketball, LBA, BNXT, IBBA, KZS and B.LEAGUE (as sdv-py keys them), and the single or
+Seasons follow SportsDataverse conventions: the ending year for NHL, NBA, college basketball, LBA, BNXT, IBBA, KZS, B.LEAGUE, ACB, FEB, BBL/DBBL and VTB (as sdv-py keys them), and the single or
 starting year elsewhere.
 
 ## Soccer competitions
@@ -86,6 +86,15 @@ Official sources only:
     file as variant `datacore` when it differs. ESPN's NBL stays league `nbl` with ESPN ids.
   - KBL: the current clubs by `team_code`, with the SVG kbl.or.kr's stylesheet draws for each club.
   - B.LEAGUE: the standings pages of every season and division since 2016-17, by club `TeamID`.
+  - ACB (Liga Endesa): api2.acb.com, every season from 2019-20, by `club_id`, with the negative mark as variant `dark`.
+  - FEB (Primera FEB, Segunda FEB, Liga Femenina): the calendar pages of baloncestoenvivo.feb.es from 2020-21, by the
+    FEB team id, which is a team-season id (one row per season).
+  - BBL and DBBL: the SCB API behind easycredit-bbl.de and toyota-dbbl.de, every season it lists, by SCB team id. Its
+    `x-api-secret` is derived on each run from a key the easycredit-bbl.de page embeds, and is never logged.
+  - VTB United League: Infobasket's calendar of the current season, by Infobasket `TeamID`.
+  - W League (`wjbl`): the latest edition's schedule on api.wjbl.01core.app, by franchise `team_id`.
+  - ACB, FEB, BBL/DBBL and W League sites carry terms on reuse, and sdv-py flags VTB as sanctions-sensitive; the owner
+    signed off on archiving their marks (2026-11-25).
 - European hockey, from the sources sdv-py's families read and keyed by the same ids:
   - SHL: every team since 1975-76 by StatNet team code, with its Sportality icon.
   - HockeyAllsvenskan (`ha`): every season since 2005-06 by `team_statnet_id`.

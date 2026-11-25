@@ -903,3 +903,274 @@ def test_page_retries_a_drop_or_a_5xx_once_skips_a_404_and_stops_on_a_block(monk
         sources._page(Session(403), "u")
     with pytest.raises(requests.ConnectionError):
         sources._page(Session(requests.ConnectionError(), requests.ConnectionError()), "u")
+
+
+def test_acb_keys_by_club_id_spans_a_reused_file_and_adds_a_distinct_negative_logo(
+    monkeypatch,
+):
+    _nosleep(monkeypatch)
+    monkeypatch.setattr(sources, "ACB_FIRST", 2026)  # editions 90 and 91 (current)
+    img = "https://static.acb.com/img/www"
+    barca = f"{img}/clubes2024/2324BarcaLogoweb.png"
+
+    def team(ed, tid, club, name, logo, second):
+        return {
+            "selected": {
+                "id": tid,
+                "editionId": ed,
+                "clubId": club,
+                "fullName": name,
+                "logo": logo,
+                "secondaryLogo": second,
+            }
+        }
+
+    bodies = {
+        None: {
+            "selectedFilters": {"competition": 1, "season": 91},
+            "teams": [
+                team(
+                    91,
+                    4473,
+                    8,
+                    "Asisa Joventut",
+                    f"{img}/clubes2026/202526AsisaJoventutLogoPosisitvo.png",
+                    f"{img}/clubes2026/202526AsisaJoventutLogoNegativo.png",
+                ),
+                team(91, 4467, 2, "Barça", barca, barca),
+            ],
+        },  # secondary = primary: no dark row
+        "90": {
+            "selectedFilters": {"competition": 1, "season": 90},
+            "teams": [
+                team(90, 4400, 2, "Barça", barca, barca),
+                team(91, 4473, 8, "stray", "x", None),
+            ],
+        },  # other edition: skipped
+    }
+    keys = []
+
+    class Session:
+        def get(self, url, headers=None, **_):
+            keys.append(headers["X-APIKEY"])
+            assert url.startswith(sources.ACB_API + "?competitionId=1")
+            return _response(200, bodies[url.split("editionId=")[1] if "editionId=" in url else None])
+
+    rows = sources.acb(Session())
+    assert set(keys) == {sources.ACB_KEY}
+    assert sorted(
+        (
+            r["entity_id"],
+            r["variant"],
+            r["url"].rsplit("/", 1)[1],
+            r["valid_from"],
+            r["valid_to"],
+        )
+        for r in rows
+    ) == [
+        ("2", "default", "2324BarcaLogoweb.png", 2026, 2027),
+        ("8", "dark", "202526AsisaJoventutLogoNegativo.png", 2027, 2027),
+        ("8", "default", "202526AsisaJoventutLogoPosisitvo.png", 2027, 2027),
+    ]
+
+
+def test_feb_reads_team_season_ids_off_the_calendar_and_skips_a_page_for_another_season(
+    monkeypatch,
+):
+    _nosleep(monkeypatch)
+    monkeypatch.setattr(sources, "FEB_FIRST", sources.dt.date.today().year + 1)  # one season, three groups
+    t = sources.dt.date.today().year
+    page = (
+        '<a id="x_Hyperlink1" href="https://baloncestoenvivo.feb.es/Equipo.aspx?i=1009716">BUENO ARENAS ALBACETE BASKET</a>'
+        '<img id="x_LogoEquipoLocal" class="logoEquipoCalendario equipoLocal" '
+        'src="https://imagenes.feb.es/Imagen.aspx?i=1009716&amp;ti=1" border="0" />'
+        '<a id="x_Hyperlink2" href="https://baloncestoenvivo.feb.es/Equipo.aspx?i=1010207">IBEROLEA PALENCIA</a>'
+    )  # Palencia's crest is not on this cut-down page: no row
+
+    class Session:
+        def __init__(self, status=200):
+            self.status = status
+
+        def get(self, url, **_):
+            g = int(url.split("g=")[1].split("&")[0])
+            start = t if g == 1 else t - 1  # groups 2 and 4 answer another season, at the URL asked for
+            season = f'<option selected="selected" value="{start}">{start}/{start + 1}</option>'
+            return _response(self.status, url=url, text=season + page)
+
+    with pytest.raises(requests.HTTPError):
+        sources.feb(Session(403))
+    rows = sources.feb(Session())
+    assert [
+        (
+            r["league"],
+            r["entity_id"],
+            r["entity_name"],
+            r["url"],
+            r["valid_from"],
+            r["valid_to"],
+        )
+        for r in rows
+    ] == [
+        (
+            "feb",
+            "1009716",
+            "BUENO ARENAS ALBACETE BASKET",
+            "https://imagenes.feb.es/imagen.aspx?i=1009716&ti=1",
+            t + 1,
+            t + 1,
+        )
+    ]
+
+
+def test_scb_derives_the_secret_from_the_page_key_and_keeps_bbl_and_dbbl_apart(
+    monkeypatch,
+):
+    _nosleep(monkeypatch)
+    page_key = "abcd:efgh:ijkl:mnop:qrst:uvwx:yz01:2345"  # made up; real keys never enter a test
+    bbl, dbbl = sources.SCB_HOSTS["bbl"], sources.SCB_HOSTS["dbbl"]
+    answers = {
+        f"{bbl}/seasons": [{"id": 2026, "isActive": True}],
+        f"{bbl}/seasons/2026": {
+            "id": 2026,
+            "teams": [
+                {
+                    "name": "ALBA BERLIN",
+                    "teamId": "413",
+                    "seasonTeamId": "413",
+                    "tlc": "BER",
+                    "logoUrl": f"{bbl}/images/teams/logo/2026/413",
+                }
+            ],
+        },
+        f"{dbbl}/seasons": [
+            {"id": 2026, "isActive": True},
+            {"id": 2015, "isActive": False},
+        ],
+        f"{dbbl}/seasons/2026": {
+            "id": 2026,
+            "teams": [
+                {
+                    "name": "Herner TC",
+                    "teamId": "105",
+                    "seasonTeamId": "105",
+                    "tlc": "HER",
+                    "logoUrl": f"{dbbl}/images/teams/logo/2026/105",
+                }
+            ],
+        },
+        f"{dbbl}/seasons/2015": {"id": 2015, "teams": []},
+    }
+    secrets = set()
+
+    class Session:
+        def get(self, url, headers=None, **_):
+            if url == sources.SCB_KEY_PAGE:
+                return _response(200, text=f'{{"key":"short"}} {{"key":"{page_key}"}}')
+            secrets.add((headers["x-api-key"], headers["x-api-secret"]))
+            return _response(200, answers[url])
+
+    rows = sources.scb(Session())
+    assert secrets == {("publicWebUser", page_key[::-1].replace(":", "-"))}
+    assert sorted((r["league"], r["entity_id"], r["url"].split("/images/")[1], r["valid_from"]) for r in rows) == [
+        ("bbl", "413", "teams/logo/2026/413", 2027),
+        ("dbbl", "105", "teams/logo/2026/105", 2027),
+    ]
+
+
+def test_vtb_keys_by_infobasket_team_id_from_the_season_calendar(monkeypatch):
+    monkeypatch.setattr(sources, "VTB_DELAY", 0)
+    game = {
+        "GameID": 1081832,
+        "TeamAid": 2994,
+        "TeamBid": 1390,
+        "CompTeamNameAen": "Zenit",
+        "CompTeamNameBen": "Uralmash",
+        "TeamLogoA": "https://files.infobasket.su/Logos/18004.png",
+        "TeamLogoB": "https://img.infobasket.su/logo/19664.png",
+    }
+    session = _answers(
+        {
+            f"{sources.VTB_API}/Comp/GetSeasonsForTag?format=json&tag=vtb": [
+                {"SeasonYear": 2026, "CompID": 50714},
+                {"SeasonYear": 2027, "CompID": 55613},
+            ],
+            f"{sources.VTB_API}/Comp/GetCalendar/?comps=55613&format=json": [
+                game,
+                {**game, "GameID": 1081833},
+            ],
+        }
+    )
+    rows = sources.vtb(session)  # 2026 is before VTB_FIRST: never asked
+    assert sorted((r["entity_id"], r["entity_name"], r["url"], r["valid_from"], r["valid_to"]) for r in rows) == [
+        ("1390", "Uralmash", "https://img.infobasket.su/logo/19664.png", 2027, 2027),
+        ("2994", "Zenit", "https://files.infobasket.su/Logos/18004.png", 2027, 2027),
+    ]
+    assert {(r["league"], r["source"]) for r in rows} == {("vtb", "infobasket")}
+
+
+def test_wjbl_reads_the_latest_edition_with_games_and_prefixes_the_league_site(
+    monkeypatch,
+):
+    monkeypatch.setattr(sources, "WJBL_DELAY", 0)
+    api = sources.WJBL_API
+
+    def game(home, away):
+        return {
+            "play_schedule_id": 1,
+            **{f"{s}_{k}": v for s, t in (("home", home), ("away", away)) for k, v in t.items()},
+        }
+
+    toyota = {
+        "team_id": 13,
+        "season_team_name": "トヨタ自動車 アンテロープス",
+        "team_logo_image": "/static/images/base_team/Bs3ia3gEK6OX9YfmScdRJNCistrBTkx6.png",
+    }
+    denso = {
+        "team_id": 12,
+        "season_team_name": "デンソー アイリス",
+        "team_logo_image": "/assets/img/team/iris.png",
+    }
+    eneos = {
+        "team_id": 8,
+        "season_team_name": "ENEOSサンフラワーズ",
+        "team_logo_image": "/static/images/base_team/Rrfl1wu4CAww9VXr6hiXOlCWrC4jARyj.png",
+    }
+    answers = {
+        f"{api}/leagues": [
+            {"league_id": 47, "league_title": "26-27 Wリーグ"},
+            {"league_id": 46, "league_title": "Wリーグオールスター2025-26"},
+            {"league_id": 45, "league_title": "25-26 Wリーグ"},
+        ],
+        f"{api}/play-schedule-months?league_id=47": {
+            "league_id": "47",
+            "game_months": [],
+        },  # no games yet
+        f"{api}/play-schedule-months?league_id=45": {
+            "league_id": "45",
+            "game_months": [{"game_month": "2026-04"}, {"game_month": "2026-01"}],
+        },
+        f"{api}/play-schedules?league_id=45&game_month=2026-04": {
+            "seasons": {"176": {"play_schedules": [game(toyota, denso)]}}
+        },
+        f"{api}/play-schedules?league_id=45&game_month=2026-01": {
+            "seasons": {"169": {"play_schedules": [game(eneos, denso)]}}
+        },
+    }
+
+    class Session:
+        def get(self, url, **_):
+            return _response(200, answers[url])
+
+    rows = sources.wjbl(Session())
+    assert sorted((r["entity_id"], r["url"]) for r in rows) == [
+        ("12", "https://www.wjbl.org/assets/img/team/iris.png"),
+        (
+            "13",
+            "https://www.wjbl.org/static/images/base_team/Bs3ia3gEK6OX9YfmScdRJNCistrBTkx6.png",
+        ),
+        (
+            "8",
+            "https://www.wjbl.org/static/images/base_team/Rrfl1wu4CAww9VXr6hiXOlCWrC4jARyj.png",
+        ),
+    ]
+    assert {(r["league"], r["source"]) for r in rows} == {("wjbl", "wjbl")}
