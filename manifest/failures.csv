@@ -12,6 +12,16 @@ conference,cfb,32,FCS Independents,,logo,dark,,,espn,https://a.espncdn.com/i/tea
 conference,cfb,37,Sun Belt Conference,,logo,dark,,,espn,https://a.espncdn.com/i/teamlogos/ncaa_conf/500-dark/37.png,"HTTP 404, not an image (1 B)",2026-11-02
 conference,mlb,103,American League,,logo,on_dark,,,mlbstatic,https://www.mlbstatic.com/team-logos/league-on-dark/103.svg,"HTTP 404, not an image (14 B)",2026-11-02
 conference,mlb,104,National League,,logo,on_dark,,,mlbstatic,https://www.mlbstatic.com/team-logos/league-on-dark/104.svg,"HTTP 404, not an image (14 B)",2026-11-02
+team,aba,13,Zagreb CO,pro,logo,default,,,abaliga,https://www.aba-liga.com/images/club/100x100/13.png,"HTTP 200, not an image (14621 B)",2026-11-25
+team,aba,16,Maccabi Electra,pro,logo,default,,,abaliga,https://www.aba-liga.com/images/club/100x100/16.png,"HTTP 200, not an image (14621 B)",2026-11-25
+team,aba,24,Vojvodina Srbijagas,pro,logo,default,,,abaliga,https://www.aba-liga.com/images/club/100x100/24.png,"HTTP 200, not an image (14621 B)",2026-11-25
+team,aba,28,Radnički,pro,logo,default,,,abaliga,https://www.aba-liga.com/images/club/100x100/28.png,"HTTP 200, not an image (14621 B)",2026-11-25
+team,aba,29,CEZ Nymburk,pro,logo,default,,,abaliga,https://www.aba-liga.com/images/club/100x100/29.png,"HTTP 200, not an image (14621 B)",2026-11-25
+team,aba,31,Szolnoki Olaj,pro,logo,default,,,abaliga,https://www.aba-liga.com/images/club/100x100/31.png,"HTTP 200, not an image (14621 B)",2026-11-25
+team,aba,34,Levski Sofija,pro,logo,default,,,abaliga,https://www.aba-liga.com/images/club/100x100/34.png,"HTTP 200, not an image (14621 B)",2026-11-25
+team,aba,35,Metalac Farmakom,pro,logo,default,,,abaliga,https://www.aba-liga.com/images/club/100x100/35.png,"HTTP 200, not an image (14621 B)",2026-11-25
+team,aba,36,Tajfun,pro,logo,default,,,abaliga,https://www.aba-liga.com/images/club/100x100/36.png,"HTTP 200, not an image (14621 B)",2026-11-25
+team,aba,9,Zlatorog Laško,pro,logo,default,,,abaliga,https://www.aba-liga.com/images/club/100x100/9.png,"HTTP 200, not an image (14621 B)",2026-11-25
 team,ajhl,10,Fort Saskatchewan Traders,junior,logo,default,2006,2007,hockeytech,https://lscluster.hockeytech.com/download.php?file_path=img/logos/10.jpg&liaf=1&client_code=ajhl,"HTTP 200, not an image (43 B)",2026-11-02
 team,ajhl,17,St. Albert Steel,junior,logo,default,2008,2012,hockeytech,https://lscluster.hockeytech.com/download.php?file_path=img/logos/17.jpg&liaf=1&client_code=ajhl,"HTTP 200, not an image (43 B)",2026-11-02
 team,ajhl,18,Calgary Mustangs,junior,logo,default,2011,2019,hockeytech,https://lscluster.hockeytech.com/download.php?file_path=img/logos/18.jpg&liaf=1&client_code=ajhl,"HTTP 200, not an image (43 B)",2026-11-02
@@ -66,6 +76,7 @@ team,f1,hrt,HRT,pro,logo,default,2012,2012,wikimedia-commons,https://upload.wiki
 team,f1,mclaren,McLaren,pro,logo,default,2007,2013,wikimedia-commons,https://upload.wikimedia.org/wikipedia/commons/7/7a/Vodafone_mclaren_f1_logo.jpg,HTTP 429,2026-11-02
 team,f1,red_bull,Red Bull,pro,logo,default,2005,2012,wikimedia-commons,https://upload.wikimedia.org/wikipedia/commons/6/68/Red_Bull_Racing_logo_ita.png,HTTP 429,2026-11-02
 team,gojhl,54,GHC Prospects,junior,logo,default,2014,2014,hockeytech,https://lscluster.hockeytech.com/download.php?file_path=img/logos/54.jpg&liaf=1&client_code=gojhl,"HTTP 200, not an image (43 B)",2026-11-02
+team,ibba,62,Maccabi Rotshtein Ashdod,pro,logo,default,2027,2027,ibba,https://basket.co.il/pics/2026-2027/%D7%A9%D7%95%D7%A0%D7%95%D7%AA/IMG_0026%20(1).PNG,"HTTP 200, not an image (173130 B)",2026-11-25
 team,kijhl,22,Penticton Lakers,junior,logo,default,2010,2013,hockeytech,https://lscluster.hockeytech.com/download.php?file_path=img/logos/22.jpg&liaf=1&client_code=kijhl,"HTTP 200, not an image (43 B)",2026-11-02
 team,milb,1210,Petroleros de Minatitlan,aaa,logo,cap_on_light,,,mlbstatic,https://www.mlbstatic.com/team-logos/team-cap-on-light/1210.svg,"HTTP 404, not an image (14 B)",2026-11-02
 team,milb,1210,Petroleros de Minatitlan,aaa,logo,default,,,mlbstatic,https://www.mlbstatic.com/team-logos/1210.svg,"HTTP 404, not an image (14 B)",2026-11-02
